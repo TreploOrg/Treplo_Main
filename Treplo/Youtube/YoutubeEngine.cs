@@ -5,27 +5,30 @@ using YoutubeExplode.Videos.Streams;
 
 namespace Treplo.Youtube;
 
-public class YoutubeClient : ISearchClient
+public class YoutubeEngine : ISearchEngine
 {
     private readonly IHttpClientFactory clientFactory;
 
-    public YoutubeClient(IHttpClientFactory clientFactory)
+    public YoutubeEngine(IHttpClientFactory clientFactory)
     {
         this.clientFactory = clientFactory;
     }
-
-    public async IAsyncEnumerable<Track> FindAsync(string name,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    
+    async IAsyncEnumerable<Track> ISearchEngine.FindInternalAsync(string query, [EnumeratorCancellation]CancellationToken cancellationToken)
     {
         var client = CreateClient();
-        var result = client.Search.GetVideosAsync(name, cancellationToken);
+        var result = client.Search.GetVideosAsync(query, cancellationToken);
         await foreach (var video in result.WithCancellation(cancellationToken))
         {
             var duration = video.Duration;
             if (duration is null)
                 continue;
             var manifest = await client.Videos.Streams.GetManifestAsync(video.Id, cancellationToken);
-            if (manifest.GetAudioOnlyStreams().TryGetWithHighestBitrate() is not IAudioStreamInfo audioStreamInfo)
+            var audioStreamInfo = manifest
+                .GetAudioOnlyStreams()
+                .Where(x => x.Container.Name != "mp4")
+                .TryGetWithHighestBitrate() as IAudioStreamInfo;
+            if (audioStreamInfo is null)
                 continue;
             yield return new Track
             {
@@ -37,6 +40,8 @@ public class YoutubeClient : ISearchClient
             };
         }
     }
+
+    public string Name => "Youtube";
 
     private YoutubeExplode.YoutubeClient CreateClient()
     {

@@ -32,8 +32,10 @@ internal static class Program
 
                     x.PrimaryHandler = handler;
                 });
-                services.AddSingleton<ISearchClient, YoutubeClient>();
+                services.AddSingleton<ISearchEngine, YoutubeEngine>();
+                services.AddSingleton<ISearchEngineManager, MixedSearchEngineManager>();
                 services.AddSingleton<IDateTimeManager, DateTimeManager>();
+                services.AddSingleton<IPlayerSessionsManager, PlayerSessionsManager>();
             })
             .UseSerilog((hostingContext, services, loggerConfiguration) =>
             {

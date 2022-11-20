@@ -1,6 +1,7 @@
 ﻿using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
+using Microsoft.Extensions.DependencyModel.Resolution;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
@@ -15,12 +16,14 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
     private readonly InteractionService interactionService;
     private readonly IServiceProvider serviceProvider;
     private readonly IDateTimeManager dateTimeManager;
+    private readonly IPlayerSessionsManager playerSessionsManager;
     private readonly IOptions<DiscordClientSettings> settings;
 
     public DiscordBotRunner(DiscordSocketClient client,
         InteractionService interactionService,
         IServiceProvider serviceProvider,
         IDateTimeManager dateTimeManager,
+        IPlayerSessionsManager playerSessionsManager,
         IOptions<DiscordClientSettings> settings,
         ILogger logger)
     {
@@ -28,15 +31,49 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
         this.interactionService = interactionService;
         this.serviceProvider = serviceProvider;
         this.dateTimeManager = dateTimeManager;
+        this.playerSessionsManager = playerSessionsManager;
         this.settings = settings;
         this.logger = logger.ForContext<DiscordBotRunner>();
 
         client.Ready += ClientOnReady;
         client.Log += ClientLog;
         client.InteractionCreated += ClientOnInteractionCreated;
+        client.SelectMenuExecuted += ClientOnSelectMenuExecuted;
 
         this.interactionService.SlashCommandExecuted += InteractionServiceOnSlashCommandExecuted;
         this.interactionService.Log += InteractionServiceLog;
+    }
+
+    private async Task ClientOnSelectMenuExecuted(SocketMessageComponent component)
+    {
+        await component.DeferAsync(ephemeral: true);
+        var data = component.Data;
+        var id = data.CustomId;
+        var user = component.User as IGuildUser;
+        if (id.StartsWith(IPlayerSessionsManager.SearchSelectMenuId) 
+            && Guid.TryParse(id.AsSpan(IPlayerSessionsManager.SearchSelectMenuId.Length), out var searchId)
+            && component.GuildId is not null 
+            && int.TryParse(data.Values.FirstOrDefault(), out var index)
+            )
+        {
+            await Task.Factory.StartNew(async () =>
+            {
+                var track = await playerSessionsManager.RespondToSearchAsync(
+                    component.GuildId.GetValueOrDefault(),
+                    user.VoiceChannel,
+                    searchId,
+                    index);
+                var trackTitle = track.Title;
+                await component.UpdateAsync(x => { x.Content = $"Selected track {trackTitle}"; });
+            });
+        }
+        else
+        {
+            await component.UpdateAsync(x =>
+            {
+                x.Content = "Something went wrong";
+            });
+        }
     }
 
     private async Task ClientOnReady()

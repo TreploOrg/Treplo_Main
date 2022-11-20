@@ -13,66 +13,77 @@ namespace Treplo;
 
 public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
 {
-    private readonly IDateTimeManager dateTimeManager;
-    private readonly ISearchClient searchClient;
+    private readonly ISearchEngineManager searchEngineManager;
+    private readonly IPlayerSessionsManager playerSessionsManager;
 
     private readonly ILogger logger;
 
-    public PlayerModule(ILogger logger, IDateTimeManager dateTimeManager, ISearchClient searchClient)
+    public PlayerModule(ILogger logger,
+        ISearchEngineManager searchEngineManager,
+        IPlayerSessionsManager playerSessionsManager)
     {
-        this.dateTimeManager = dateTimeManager;
-        this.searchClient = searchClient;
+        this.searchEngineManager = searchEngineManager;
+        this.playerSessionsManager = playerSessionsManager;
         this.logger = logger.ForContext<PlayerModule>();
     }
 
-    [SlashCommand("play", "rickroll's you", true, RunMode.Async)]
-    public async Task Play(string query)
+    [SlashCommand("play", "Enqueues first song found for provided query or starts playback if no query is provided",
+        true, RunMode.Async)]
+    public async Task Play(string? query = null)
     {
         await DeferAsync(ephemeral: true);
+        var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
+        if (voiceChannel is null)
+        {
+            await FollowupAsync("User is not in a voice channel");
+            return;
+        }
+
         Track? track = null;
-        await foreach (var t in searchClient.FindAsync(query))
+        if (query is not null)
         {
-            track = t;
-            break;
+            var searchResult = await searchEngineManager.SearchAsync(query).FirstOrDefaultAsync();
+
+            if (searchResult == default)
+            {
+                await FollowupAsync($"Couldn't find song {query}", ephemeral: true);
+                return;
+            }
+
+            track = searchResult.Track;
         }
 
-        if (track is null)
+        await playerSessionsManager.PlayAsync(Context.Guild.Id, voiceChannel, track);
+        await FollowupAsync("Starting playback");
+    }
+
+    [SlashCommand("search", "Searches for a song and allows to choose from found songs", true, RunMode.Async)]
+    public async Task Search(string query, int limit = 5)
+    {
+        await DeferAsync(ephemeral: true);
+        var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
+        if (voiceChannel is null)
+        {
+            await FollowupAsync("User is not in a voice channel");
+            return;
+        }
+
+        var tracks = await searchEngineManager.SearchAsync(query).Take(limit).ToArrayAsync();
+        if (tracks.Length == 0)
+        {
             await FollowupAsync($"Couldn't find song {query}", ephemeral: true);
-        var voiceChannel = (Context.User as IGuildUser)!.VoiceChannel;
-        var sourceStreamFile = track.Value.Source.Url;
-        using var audioClient = await voiceChannel.ConnectAsync();
-        await FollowupAsync($"{query} in progress", ephemeral: true);
-        await StartPlayBack(audioClient, sourceStreamFile);
-        await ModifyOriginalResponseAsync(x => x.Content = $"{query} finished");
-    }
-
-    private readonly WaveFormat outputFormat = new(48000, 16, 2);
-
-    private async Task StartPlayBack(IAudioClient audioClient, string sourceStreamPath)
-    {
-        await using var inAudio = new MediaFoundationReader(sourceStreamPath);
-        await using var resampler = new WaveFormatConversionStream(outputFormat, inAudio);
-        var blocksSize = outputFormat.AverageBytesPerSecond / 50;
-        await StreamCopy(audioClient, resampler, blocksSize);
-    }
-
-    private async Task StreamCopy(IAudioClient audioClient, Stream source, int bufferSize)
-    {
-        await using var destinationStream = audioClient.CreatePCMStream(AudioApplication.Music);
-        try
-        {
-            await source.CopyToAsync(destinationStream);
+            return;
         }
-        catch (OperationCanceledException)
-        {
-            logger.Information("Playback was canceled");
-        }
-        finally
-        {
-            var timeoutTask = Task.Delay(1000);
-            var flushTask = destinationStream.FlushAsync();
 
-            await Task.WhenAny(timeoutTask, flushTask);
-        }
+        var searchId = await playerSessionsManager.StartSearchAsync(Context.Guild.Id, voiceChannel, tracks);
+        var componentBuilder = new ComponentBuilder()
+            .WithSelectMenu(
+                $"{IPlayerSessionsManager.SearchSelectMenuId}{searchId}",
+                tracks
+                    .Select((x, i) => new SelectMenuOptionBuilder(x.Track.Title, i.ToString(),
+                        description: $"{x.Track.Author}. {x.SearchEngineName}"))
+                    .ToList()
+            );
+        await FollowupAsync("Select a song to enqueue", components: componentBuilder.Build());
     }
 }
