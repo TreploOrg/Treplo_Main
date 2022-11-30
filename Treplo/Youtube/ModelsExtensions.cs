@@ -1,5 +1,5 @@
-﻿using YoutubeExplode.Common;
-using YoutubeExplode.Videos.Streams;
+﻿using YoutubeExplorer.Common;
+using YoutubeExplorer.Videos.Streams;
 
 namespace Treplo.Youtube;
 

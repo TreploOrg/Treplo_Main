@@ -1,7 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using Treplo.Models;
-using YoutubeExplode.Common;
-using YoutubeExplode.Videos.Streams;
+using YoutubeExplorer.Common;
+using YoutubeExplorer.Videos.Streams;
 
 namespace Treplo.Youtube;
 
@@ -43,9 +43,9 @@ public class YoutubeEngine : ISearchEngine
 
     public string Name => "Youtube";
 
-    private YoutubeExplode.YoutubeClient CreateClient()
+    private YoutubeExplorer.YoutubeClient CreateClient()
     {
-        var httpClient = clientFactory.CreateClient(nameof(YoutubeExplode));
-        return new YoutubeExplode.YoutubeClient(httpClient);
+        var httpClient = clientFactory.CreateClient(nameof(YoutubeExplorer));
+        return new YoutubeExplorer.YoutubeClient(httpClient);
     }
 }

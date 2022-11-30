@@ -19,11 +19,10 @@ internal static class Program
             .ConfigureServices((hostCtx, services) =>
             {
                 SetupDiscordBot(services, hostCtx);
-                services.AddHttpClient(nameof(YoutubeExplode)).ConfigureHttpMessageHandlerBuilder(x =>
+                services.AddHttpClient(nameof(YoutubeExplorer)).ConfigureHttpMessageHandlerBuilder(x =>
                 {
                     var handler = new HttpClientHandler
                     {
-                        // https://github.com/Tyrrrz/YoutubeExplode/issues/530
                         UseCookies = false
                     };
 
