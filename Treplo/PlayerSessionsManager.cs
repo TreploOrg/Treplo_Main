@@ -9,11 +9,13 @@ namespace Treplo;
 
 public sealed class PlayerSessionsManager : IPlayerSessionsManager
 {
+    private readonly IHttpClientFactory httpClientFactory;
     private readonly ConcurrentDictionary<ulong, PlayerGuildSession> sessions;
     private readonly ILogger logger;
 
-    public PlayerSessionsManager(ILogger logger)
+    public PlayerSessionsManager(IHttpClientFactory httpClientFactory, ILogger logger)
     {
+        this.httpClientFactory = httpClientFactory;
         this.logger = logger.ForContext<PlayerSessionsManager>();
         sessions = new ConcurrentDictionary<ulong, PlayerGuildSession>();
     }
@@ -57,7 +59,7 @@ public sealed class PlayerSessionsManager : IPlayerSessionsManager
 
     private PlayerGuildSession CreatSession(ulong arg)
     {
-        return new PlayerGuildSession(new NonPersistentPlayer(logger));
+        return new PlayerGuildSession(new NonPersistentPlayer(httpClientFactory, logger));
     }
 
     private class PlayerGuildSession : IDisposable, IAsyncDisposable

@@ -1,7 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using Discord;
 using Discord.Audio;
-using NAudio.Wave;
 using Serilog;
 using Treplo.Models;
 
@@ -9,7 +8,7 @@ namespace Treplo.Players;
 
 public sealed class NonPersistentPlayer : IPlayer
 {
-    private static readonly WaveFormat OutputFormat = new(48000, 16, 2);
+    private readonly IHttpClientFactory httpClientFactory;
     private readonly ILogger logger;
     private readonly ConcurrentQueue<Track> trackQueue = new();
     private IVoiceChannel? voiceChannel;
@@ -34,8 +33,9 @@ public sealed class NonPersistentPlayer : IPlayer
         }
     }
 
-    public NonPersistentPlayer(ILogger logger)
+    public NonPersistentPlayer(IHttpClientFactory httpClientFactory, ILogger logger)
     {
+        this.httpClientFactory = httpClientFactory;
         this.logger = logger.ForContext<NonPersistentPlayer>();
         cts = new CancellationTokenSource();
     }
@@ -111,16 +111,16 @@ public sealed class NonPersistentPlayer : IPlayer
             return;
         }
 
+        using var httpClient = player.httpClientFactory.CreateClient(nameof(NonPersistentPlayer));
         await using var pcm = player.audioClient.CreatePCMStream(AudioApplication.Music);
         try
         {
             while (!cts.IsCancellationRequested)
             {
-                player.logger.Information("Starting track {Track}", currTrack.Value.Track.Title);
-                await using var inAudio = new MediaFoundationReader(currTrack.Value.Track.Source.Url);
-                inAudio.CurrentTime = currTrack.Value.CurrentPosition;
-                await using var resampler = new WaveFormatConversionStream(OutputFormat, inAudio);
-                resampler.CopyTo(pcm);
+                var track = currTrack.Value.Track;
+                player.logger.Information("Starting track {Track}", track.Title);
+                await using var inAudio = await httpClient.GetStreamAsync(track.Source.Url, cts.Token);
+                await Ffmpeg.PipeToAsync(inAudio, track.Source, pcm, cts.Token);
                 currTrack = player.GetCurrentTrack(true);
                 if (currTrack is null) 
                     return;

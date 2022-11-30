@@ -26,7 +26,6 @@ public class YoutubeEngine : ISearchEngine
             var manifest = await client.Videos.Streams.GetManifestAsync(video.Id, cancellationToken);
             var audioStreamInfo = manifest
                 .GetAudioOnlyStreams()
-                .Where(x => x.Container.Name != "mp4")
                 .TryGetWithHighestBitrate() as IAudioStreamInfo;
             if (audioStreamInfo is null)
                 continue;

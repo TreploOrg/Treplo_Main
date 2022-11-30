@@ -1,12 +1,6 @@
-﻿using System.Buffers;
-using Discord;
-using Discord.Audio;
+﻿using Discord;
 using Discord.Interactions;
-using Discord.Net;
-using Discord.WebSocket;
-using NAudio.Wave;
 using Serilog;
-using System;
 using Treplo.Models;
 
 namespace Treplo;

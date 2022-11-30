@@ -8,21 +8,21 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Discord.Net" Version="3.8.1"/>
-        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="7.0.0"/>
-        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="7.0.0"/>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="7.0.0"/>
-        <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.0"/>
-        <PackageReference Include="Microsoft.Extensions.Http" Version="7.0.0"/>
-        <PackageReference Include="Microsoft.Extensions.Options" Version="7.0.0"/>
-        <PackageReference Include="NAudio" Version="2.1.0"/>
-        <PackageReference Include="Serilog" Version="2.12.0"/>
-        <PackageReference Include="Serilog.Extensions.Hosting" Version="5.0.1"/>
-        <PackageReference Include="Serilog.Extensions.Logging" Version="3.1.0"/>
-        <PackageReference Include="Serilog.Settings.Configuration" Version="3.4.0"/>
-        <PackageReference Include="Serilog.Sinks.Console" Version="4.1.0"/>
-        <PackageReference Include="System.Reactive" Version="5.0.0"/>
-        <PackageReference Include="System.Reactive.Linq" Version="5.0.0"/>
+        <PackageReference Include="CliWrap" Version="3.5.0" />
+        <PackageReference Include="Discord.Net" Version="3.8.1" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Http" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Options" Version="7.0.0" />
+        <PackageReference Include="Serilog" Version="2.12.0" />
+        <PackageReference Include="Serilog.Extensions.Hosting" Version="5.0.1" />
+        <PackageReference Include="Serilog.Extensions.Logging" Version="3.1.0" />
+        <PackageReference Include="Serilog.Settings.Configuration" Version="3.4.0" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="4.1.0" />
+        <PackageReference Include="System.Reactive" Version="5.0.0" />
+        <PackageReference Include="System.Reactive.Linq" Version="5.0.0" />
     </ItemGroup>
 
     <ItemGroup>
@@ -34,19 +34,25 @@
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <TargetPath>opus.dll</TargetPath>
         </ContentWithTargetPath>
-        <None Include="external\opus.dll"/>
+        <None Include="external\opus.dll" />
 
         <ContentWithTargetPath Include="external\libsodium.dll">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <TargetPath>libsodium.dll</TargetPath>
         </ContentWithTargetPath>
-        <None Include="external\libsodium.dll"/>
+        <None Include="external\libsodium.dll" />
 
         <ContentWithTargetPath Include="external\YoutubeExplorer.dll">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <TargetPath>YoutubeExplorer.dll</TargetPath>
         </ContentWithTargetPath>
-        <None Include="external\YoutubeExplorer.dll"/>
+        <None Include="external\YoutubeExplorer.dll" />
+
+        <ContentWithTargetPath Include="external\ffmpeg.exe">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <TargetPath>ffmpeg.exe</TargetPath>
+        </ContentWithTargetPath>
+        <None Include="external\ffmpeg.exe" />
     </ItemGroup>
 
     <ItemGroup>
