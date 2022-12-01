@@ -113,6 +113,7 @@ public sealed class NonPersistentPlayer : IPlayer
 
         using var httpClient = player.httpClientFactory.CreateClient(nameof(NonPersistentPlayer));
         await using var pcm = player.audioClient.CreatePCMStream(AudioApplication.Music);
+        var ffmpeg = Ffmpeg.Create().To(pcm);
         try
         {
             while (!cts.IsCancellationRequested)
@@ -120,7 +121,7 @@ public sealed class NonPersistentPlayer : IPlayer
                 var track = currTrack.Value.Track;
                 player.logger.Information("Starting track {Track}", track.Title);
                 await using var inAudio = await httpClient.GetStreamAsync(track.Source.Url, cts.Token);
-                await Ffmpeg.PipeToAsync(inAudio, track.Source, pcm, cts.Token);
+                await ffmpeg.ForSource(track.Source).From(inAudio).PipeAsync(cts.Token);
                 currTrack = player.GetCurrentTrack(true);
                 if (currTrack is null) 
                     return;
