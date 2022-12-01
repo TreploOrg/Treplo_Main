@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Reflection;
+using System.Text;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
+using Serilog.Events;
 using Treplo.Youtube;
 
 namespace Treplo;
@@ -38,8 +40,11 @@ internal static class Program
             })
             .UseSerilog((hostingContext, services, loggerConfiguration) =>
             {
+                Console.OutputEncoding = Encoding.UTF8;
                 loggerConfiguration
                     .ReadFrom.Configuration(hostingContext.Configuration)
+                    .MinimumLevel.Override("Microsoft", LogEventLevel.Error)
+                    .MinimumLevel.Override("System", LogEventLevel.Error)
                     .Enrich.FromLogContext()
                     .WriteTo.Console();
             });
