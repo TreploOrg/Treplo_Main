@@ -13,14 +13,14 @@ public static class StartupHelpers
         builder.Services.AddMediatR(Assembly.GetExecutingAssembly());
         return builder;
     }
-    
+
     public static WebApplicationBuilder AddYoutubeEngine(this WebApplicationBuilder builder)
     {
         builder.Services.AddHttpClient<YoutubeEngine>().ConfigureHttpMessageHandlerBuilder(x =>
         {
             var handler = new HttpClientHandler
             {
-                UseCookies = false
+                UseCookies = false,
             };
 
             if (handler.SupportsAutomaticDecompression)
@@ -32,7 +32,7 @@ public static class StartupHelpers
         builder.Services.AddSingleton<ISearchEngine, YoutubeEngine>();
         return builder;
     }
-    
+
     public static WebApplicationBuilder AddSearchEngineManager(this WebApplicationBuilder builder)
     {
         builder.Services.AddSingleton<ISearchEngineManager, MixedSearchEngineManager>();

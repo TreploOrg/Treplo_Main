@@ -1,7 +1,6 @@
 ﻿using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
-using Microsoft.Extensions.DependencyModel.Resolution;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
@@ -12,20 +11,22 @@ namespace Treplo;
 public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDisposable
 {
     private readonly DiscordSocketClient client;
-    private readonly ILogger logger;
-    private readonly InteractionService interactionService;
-    private readonly IServiceProvider serviceProvider;
     private readonly IDateTimeManager dateTimeManager;
+    private readonly InteractionService interactionService;
+    private readonly ILogger logger;
     private readonly IPlayerSessionsManager playerSessionsManager;
+    private readonly IServiceProvider serviceProvider;
     private readonly IOptions<DiscordClientSettings> settings;
 
-    public DiscordBotRunner(DiscordSocketClient client,
+    public DiscordBotRunner(
+        DiscordSocketClient client,
         InteractionService interactionService,
         IServiceProvider serviceProvider,
         IDateTimeManager dateTimeManager,
         IPlayerSessionsManager playerSessionsManager,
         IOptions<DiscordClientSettings> settings,
-        ILogger logger)
+        ILogger logger
+    )
     {
         this.client = client;
         this.interactionService = interactionService;
@@ -44,18 +45,57 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
         this.interactionService.Log += InteractionServiceLog;
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        await client.DisposeAsync();
+    }
+
+    public void Dispose()
+    {
+        client.Dispose();
+    }
+
+    public async Task StartAsync(CancellationToken cancellationToken = default)
+    {
+        await client.LoginAsync(TokenType.Bot, settings.Value.Token);
+        await client.StartAsync();
+    }
+
+    public async Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested)
+            return;
+
+        logger.Information("Performing graceful shutdown");
+        await client.LogoutAsync();
+        await DisposeAsync();
+    }
+
+    private static LogEventLevel GetSerilogLevel(LogSeverity logMessageSeverity)
+    {
+        return logMessageSeverity switch
+        {
+            LogSeverity.Critical => LogEventLevel.Fatal,
+            LogSeverity.Error => LogEventLevel.Error,
+            LogSeverity.Warning => LogEventLevel.Warning,
+            LogSeverity.Info => LogEventLevel.Information,
+            LogSeverity.Verbose => LogEventLevel.Verbose,
+            LogSeverity.Debug => LogEventLevel.Debug,
+            _ => throw new ArgumentOutOfRangeException(nameof(logMessageSeverity), logMessageSeverity, null),
+        };
+    }
+
     private async Task ClientOnSelectMenuExecuted(SocketMessageComponent component)
     {
-        await component.DeferAsync(ephemeral: true);
+        await component.DeferAsync(true);
         var data = component.Data;
         var id = data.CustomId;
         var user = component.User as IGuildUser;
-        if (id.StartsWith(IPlayerSessionsManager.SearchSelectMenuId) 
+        if (id.StartsWith(IPlayerSessionsManager.SearchSelectMenuId)
             && Guid.TryParse(id.AsSpan(IPlayerSessionsManager.SearchSelectMenuId.Length), out var searchId)
-            && component.GuildId is not null 
+            && component.GuildId is not null
             && int.TryParse(data.Values.FirstOrDefault(), out var index)
-            )
-        {
+        )
             await Task.Factory.StartNew(async () =>
             {
                 var track = await playerSessionsManager.RespondToSearchAsync(
@@ -66,14 +106,8 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
                 var trackTitle = track.Title;
                 await component.UpdateAsync(x => { x.Content = $"Selected track {trackTitle}"; });
             });
-        }
         else
-        {
-            await component.UpdateAsync(x =>
-            {
-                x.Content = "Something went wrong";
-            });
-        }
+            await component.UpdateAsync(x => { x.Content = "Something went wrong"; });
     }
 
     private async Task ClientOnReady()
@@ -82,8 +116,11 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
             .Select(async x => await (Task)interactionService.RegisterCommandsToGuildAsync(x.Id)));
     }
 
-    private async Task InteractionServiceOnSlashCommandExecuted(SlashCommandInfo? command, IInteractionContext context,
-        IResult result)
+    private async Task InteractionServiceOnSlashCommandExecuted(
+        SlashCommandInfo? command,
+        IInteractionContext context,
+        IResult result
+    )
     {
         if (result.IsSuccess)
         {
@@ -121,15 +158,9 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
         await interactionService.ExecuteCommandAsync(interactionContext, serviceProvider);
     }
 
-    private Task ClientLog(LogMessage logMessage)
-    {
-        return SourcedLog(logMessage, "Client");
-    }
+    private Task ClientLog(LogMessage logMessage) => SourcedLog(logMessage, "Client");
 
-    private Task InteractionServiceLog(LogMessage logMessage)
-    {
-        return SourcedLog(logMessage, "Interaction Service");
-    }
+    private Task InteractionServiceLog(LogMessage logMessage) => SourcedLog(logMessage, "Interaction Service");
 
     private Task SourcedLog(LogMessage logMessage, string source)
     {
@@ -140,45 +171,5 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
             logMessage.Source,
             logMessage.Message ?? string.Empty);
         return Task.CompletedTask;
-    }
-
-    private static LogEventLevel GetSerilogLevel(LogSeverity logMessageSeverity)
-    {
-        return logMessageSeverity switch
-        {
-            LogSeverity.Critical => LogEventLevel.Fatal,
-            LogSeverity.Error => LogEventLevel.Error,
-            LogSeverity.Warning => LogEventLevel.Warning,
-            LogSeverity.Info => LogEventLevel.Information,
-            LogSeverity.Verbose => LogEventLevel.Verbose,
-            LogSeverity.Debug => LogEventLevel.Debug,
-            _ => throw new ArgumentOutOfRangeException(nameof(logMessageSeverity), logMessageSeverity, null)
-        };
-    }
-
-    public void Dispose()
-    {
-        client.Dispose();
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await client.DisposeAsync();
-    }
-
-    public async Task StartAsync(CancellationToken cancellationToken = default)
-    {
-        await client.LoginAsync(TokenType.Bot, settings.Value.Token);
-        await client.StartAsync();
-    }
-
-    public async Task StopAsync(CancellationToken cancellationToken = default)
-    {
-        if (cancellationToken.IsCancellationRequested)
-            return;
-
-        logger.Information("Performing graceful shutdown");
-        await client.LogoutAsync();
-        await DisposeAsync();
     }
 }

@@ -8,14 +8,15 @@ namespace Treplo;
 
 public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
 {
-    private readonly ISearchServiceClient searchServiceClient;
-    private readonly IPlayerSessionsManager playerSessionsManager;
-
     private readonly ILogger logger;
+    private readonly IPlayerSessionsManager playerSessionsManager;
+    private readonly ISearchServiceClient searchServiceClient;
 
-    public PlayerModule(ILogger logger,
+    public PlayerModule(
+        ILogger logger,
         ISearchServiceClient searchServiceClient,
-        IPlayerSessionsManager playerSessionsManager)
+        IPlayerSessionsManager playerSessionsManager
+    )
     {
         this.searchServiceClient = searchServiceClient;
         this.playerSessionsManager = playerSessionsManager;
@@ -26,7 +27,7 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
         true, RunMode.Async)]
     public async Task Play(string? query = null)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(true);
         var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
         if (voiceChannel is null)
         {
@@ -53,9 +54,9 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
     }
 
     [SlashCommand("search", "Searches for a song and allows to choose from found songs", true, RunMode.Async)]
-    public async Task Search(string query, int limit = 5)
+    public async Task Search(string query, uint limit = 5)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(true);
         var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
         if (voiceChannel is null)
         {
@@ -63,7 +64,7 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
             return;
         }
 
-        var tracks = await searchServiceClient.SearchAsync(query).Take(limit).ToArrayAsync();
+        var tracks = await searchServiceClient.SearchAsync(query, limit).ToArrayAsync();
         if (tracks.Length == 0)
         {
             await FollowupAsync($"Couldn't find song {query}", ephemeral: true);
@@ -76,7 +77,7 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
                 $"{IPlayerSessionsManager.SearchSelectMenuId}{searchId}",
                 tracks
                     .Select((x, i) => new SelectMenuOptionBuilder(x.Track.Title, i.ToString(),
-                        description: $"{x.Track.Author}. {x.SearchEngineName}"))
+                        $"{x.Track.Author}. {x.SearchEngineName}"))
                     .ToList()
             );
         await FollowupAsync("Select a song to enqueue", components: componentBuilder.Build());

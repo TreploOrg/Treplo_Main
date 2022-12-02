@@ -6,64 +6,64 @@ namespace Treplo;
 
 public sealed class Ffmpeg : Command
 {
-    public static async ValueTask PipeToAsync(Stream inStream, StreamInfo streamInfo, Stream outStream,
-        CancellationToken cancellationToken = default)
+    private Ffmpeg(string targetFilePath) : base(targetFilePath)
     {
-        var errorBuilder = new StringBuilder();
-        var command = inStream | Cli.Wrap("ffmpeg.exe")
-            .WithArguments(GetArguments(streamInfo))
-            .WithStandardErrorPipe(PipeTarget.ToStringBuilder(errorBuilder))
-            .WithStandardOutputPipe(PipeTarget.ToStream(outStream, false));
+    }
 
-        var result = await command.ExecuteAsync(cancellationToken);
-
-        if (result.ExitCode != 0)
-            throw new FfmpegPipingException(errorBuilder.ToString());
+    private Ffmpeg(
+        string targetFilePath,
+        string arguments,
+        string workingDirPath,
+        Credentials credentials,
+        IReadOnlyDictionary<string, string?> environmentVariables,
+        CommandResultValidation validation,
+        PipeSource standardInputPipe,
+        PipeTarget standardOutputPipe,
+        PipeTarget standardErrorPipe
+    )
+        : base(targetFilePath, arguments, workingDirPath, credentials, environmentVariables, validation,
+            standardInputPipe, standardOutputPipe, standardErrorPipe)
+    {
     }
 
     public static Ffmpeg Create() => new("ffmpeg.exe");
 
-    public Ffmpeg To(Stream outStream, bool autoFlush = false)
-        => new(
-            TargetFilePath,
-            Arguments,
-            WorkingDirPath,
-            Credentials,
-            EnvironmentVariables,
-            Validation,
-            StandardInputPipe,
-            PipeTarget.ToStream(outStream, autoFlush),
-            StandardErrorPipe
-        );
+    public Ffmpeg To(Stream outStream, bool autoFlush = false) => new(
+        TargetFilePath,
+        Arguments,
+        WorkingDirPath,
+        Credentials,
+        EnvironmentVariables,
+        Validation,
+        StandardInputPipe,
+        PipeTarget.ToStream(outStream, autoFlush),
+        StandardErrorPipe
+    );
 
-    public Ffmpeg ForSource(StreamInfo trackSource)
-        => new(
-            TargetFilePath,
-            GetArguments(trackSource),
-            WorkingDirPath,
-            Credentials,
-            EnvironmentVariables,
-            Validation,
-            StandardInputPipe,
-            StandardOutputPipe,
-            StandardErrorPipe
-        );
-    
-    public Ffmpeg From(Stream inStream)
-    {
-        return new(
-            TargetFilePath,
-            Arguments,
-            WorkingDirPath,
-            Credentials,
-            EnvironmentVariables,
-            Validation,
-            PipeSource.FromStream(inStream), 
-            StandardOutputPipe,
-            StandardErrorPipe
-        );
-    }
-    
+    public Ffmpeg ForSource(StreamInfo trackSource) => new(
+        TargetFilePath,
+        GetArguments(trackSource),
+        WorkingDirPath,
+        Credentials,
+        EnvironmentVariables,
+        Validation,
+        StandardInputPipe,
+        StandardOutputPipe,
+        StandardErrorPipe
+    );
+
+    public Ffmpeg From(Stream inStream) => new(
+        TargetFilePath,
+        Arguments,
+        WorkingDirPath,
+        Credentials,
+        EnvironmentVariables,
+        Validation,
+        PipeSource.FromStream(inStream),
+        StandardOutputPipe,
+        StandardErrorPipe
+    );
+
     public async ValueTask PipeAsync(CancellationToken cancellationToken = default)
     {
         var errorBuilder = new StringBuilder();
@@ -79,18 +79,6 @@ public sealed class Ffmpeg : Command
         var codec = container.Name == "mp4" ? "aac" : streamInfo.Codec.Name;
 
         return $"-hide_banner -loglevel error -f {container.Name} -codec {codec} -i - -ac 2 -f s16le -ar 48000 -";
-    }
-
-    private Ffmpeg(string targetFilePath) : base(targetFilePath)
-    {
-    }
-
-    private Ffmpeg(string targetFilePath, string arguments, string workingDirPath, Credentials credentials,
-        IReadOnlyDictionary<string, string?> environmentVariables, CommandResultValidation validation,
-        PipeSource standardInputPipe, PipeTarget standardOutputPipe, PipeTarget standardErrorPipe)
-        : base(targetFilePath, arguments, workingDirPath, credentials, environmentVariables, validation,
-            standardInputPipe, standardOutputPipe, standardErrorPipe)
-    {
     }
 }
 

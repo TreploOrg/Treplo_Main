@@ -5,7 +5,12 @@ namespace Treplo.SearchService.Searching;
 
 public interface ISearchEngine
 {
-    async IAsyncEnumerable<TrackSearchResult> FindAsync(string query, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    string Name { get; }
+
+    async IAsyncEnumerable<TrackSearchResult> FindAsync(
+        string query,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default
+    )
     {
         await foreach (var track in FindInternalAsync(query, cancellationToken))
         {
@@ -14,6 +19,4 @@ public interface ISearchEngine
     }
 
     protected IAsyncEnumerable<Track> FindInternalAsync(string query, CancellationToken cancellationToken = default);
-    
-    string Name { get; }
 }

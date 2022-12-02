@@ -16,8 +16,12 @@ public class YoutubeEngine : ISearchEngine
         this.clientFactory = clientFactory;
     }
 
-    async IAsyncEnumerable<Track> ISearchEngine.FindInternalAsync(string query,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+    public string Name => "Youtube";
+
+    async IAsyncEnumerable<Track> ISearchEngine.FindInternalAsync(
+        string query,
+        [EnumeratorCancellation] CancellationToken cancellationToken
+    )
     {
         using var httpClient = clientFactory.CreateClient(nameof(YoutubeEngine));
         var youtubeClient = new YoutubeClient(httpClient);
@@ -56,6 +60,4 @@ public class YoutubeEngine : ISearchEngine
             Duration = video.Duration.GetValueOrDefault(),
         };
     }
-
-    public string Name => "Youtube";
 }

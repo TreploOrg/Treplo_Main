@@ -1,12 +1,14 @@
-﻿using YoutubeExplorer.Common;
+﻿using Treplo.Common.Models;
 using YoutubeExplorer.Videos.Streams;
-using Models = Treplo.Common.Models;
+using Bitrate = Treplo.Common.Models.Bitrate;
+using Container = Treplo.Common.Models.Container;
+using FileSize = Treplo.Common.Models.FileSize;
 
 namespace Treplo.SearchService.Searching.Youtube;
 
 public static class ModelsExtensions
 {
-    public static Models.StreamInfo Into(this IAudioStreamInfo streamInfo) => new()
+    public static StreamInfo Into(this IAudioStreamInfo streamInfo) => new()
     {
         Url = streamInfo.Url,
         Bitrate = streamInfo.Bitrate.Into(),
@@ -14,9 +16,14 @@ public static class ModelsExtensions
         Container = streamInfo.Container.Into(),
         Size = streamInfo.Size.Into(),
     };
-    public static Models.Bitrate Into(in this Bitrate bitrate) => new(bitrate.BitsPerSecond);
-    public static Models.Thumbnail Into(this Thumbnail thumbnail) => new(thumbnail.Url);
-    public static Models.FileSize Into(in this FileSize fileSize) => new(fileSize.Bytes);
-    public static Models.Container Into(in this Container container) => new(container.Name);
-    public static Models.Codec Into(this string codec) => new(codec);
+
+    public static Bitrate Into(in this YoutubeExplorer.Videos.Streams.Bitrate bitrate) => new(bitrate.BitsPerSecond);
+
+    public static Thumbnail Into(this YoutubeExplorer.Common.Thumbnail thumbnail) => new(thumbnail.Url);
+
+    public static FileSize Into(in this YoutubeExplorer.Videos.Streams.FileSize fileSize) => new(fileSize.Bytes);
+
+    public static Container Into(in this YoutubeExplorer.Videos.Streams.Container container) => new(container.Name);
+
+    public static Codec Into(this string codec) => new(codec);
 }

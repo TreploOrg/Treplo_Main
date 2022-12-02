@@ -7,8 +7,8 @@ namespace Treplo.SearchService.Handlers;
 
 public class SearchRequestHandler : IStreamRequestHandler<SearchRequest, TrackSearchResult>
 {
-    private readonly ISearchEngineManager searchEngineManager;
     private readonly ILogger<SearchRequestHandler> logger;
+    private readonly ISearchEngineManager searchEngineManager;
 
     public SearchRequestHandler(ISearchEngineManager searchEngineManager, ILogger<SearchRequestHandler> logger)
     {

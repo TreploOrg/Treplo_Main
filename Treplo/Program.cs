@@ -1,7 +1,5 @@
-﻿using System.Net;
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text;
-using System.Text.Json;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
@@ -21,14 +19,17 @@ internal static class Program
         var hostBuilder = Host.CreateDefaultBuilder(args)
             .ConfigureServices((hostCtx, services) =>
             {
+                services.AddHttpClient();
                 SetupDiscordBot(services, hostCtx);
                 services.AddSingleton<IDateTimeManager, DateTimeManager>();
-                services.AddSingleton<IPlayerSessionsManager, PlayerSessionsManager>();
-                
+                services
+                    .AddSingleton<IPlayerSessionsManager, PlayerSessionsManager>();
+
                 services.Configure<SearchServiceClientSettings>(
-                    hostCtx.Configuration.GetSection(nameof(SearchServiceClientSettings)));
+                    hostCtx.Configuration
+                        .GetSection(nameof(SearchServiceClientSettings)));
                 services.AddOptions<SearchServiceClientSettings>();
-                
+
                 services.AddTransient<ISearchServiceClient, SearchServiceClient>();
             })
             .UseSerilog((hostingContext, _, loggerConfiguration) =>
@@ -58,14 +59,16 @@ internal static class Program
             var client = new DiscordSocketClient(new DiscordSocketConfig
             {
                 GatewayIntents = settings.Value.Intents
-                    .Aggregate(GatewayIntents.None, (seed, cur) => seed | cur)
+                    .Aggregate(GatewayIntents.None,
+                        (seed, cur) => seed | cur),
             });
 
             return client;
         });
         services.AddSingleton(ctx =>
             {
-                var interactionService = new InteractionService(ctx.GetRequiredService<DiscordSocketClient>());
+                var interactionService =
+                    new InteractionService(ctx.GetRequiredService<DiscordSocketClient>());
                 interactionService.AddModulesAsync(Assembly.GetExecutingAssembly(), ctx);
                 return interactionService;
             }

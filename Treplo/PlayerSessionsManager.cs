@@ -1,22 +1,32 @@
 ﻿using System.Collections.Concurrent;
 using Discord;
 using Serilog;
-using Treplo.Players;
 using Treplo.Common.Models;
+using Treplo.Players;
 
 namespace Treplo;
 
 public sealed class PlayerSessionsManager : IPlayerSessionsManager
 {
     private readonly IHttpClientFactory httpClientFactory;
-    private readonly ConcurrentDictionary<ulong, PlayerGuildSession> sessions;
     private readonly ILogger logger;
+    private readonly ConcurrentDictionary<ulong, PlayerGuildSession> sessions;
 
     public PlayerSessionsManager(IHttpClientFactory httpClientFactory, ILogger logger)
     {
         this.httpClientFactory = httpClientFactory;
         this.logger = logger.ForContext<PlayerSessionsManager>();
         sessions = new ConcurrentDictionary<ulong, PlayerGuildSession>();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var (_, session) in sessions) await session.DisposeAsync();
+    }
+
+    public void Dispose()
+    {
+        foreach (var (_, session) in sessions) session.Dispose();
     }
 
     public async ValueTask PlayAsync(ulong guildId, IVoiceChannel? voiceChannel = null, Track? track = null)
@@ -37,7 +47,12 @@ public sealed class PlayerSessionsManager : IPlayerSessionsManager
         return searchId;
     }
 
-    public async ValueTask<Track> RespondToSearchAsync(ulong guildId, IVoiceChannel voiceChannel, Guid searchId, int searchResultIndex)
+    public async ValueTask<Track> RespondToSearchAsync(
+        ulong guildId,
+        IVoiceChannel voiceChannel,
+        Guid searchId,
+        int searchResultIndex
+    )
     {
         var session = await GetSessionAsync(guildId);
         logger.Information("Responding to search {SearchId}", searchId);
@@ -56,10 +71,7 @@ public sealed class PlayerSessionsManager : IPlayerSessionsManager
         return session;
     }
 
-    private PlayerGuildSession CreatSession(ulong arg)
-    {
-        return new PlayerGuildSession(new NonPersistentPlayer(httpClientFactory, logger));
-    }
+    private PlayerGuildSession CreatSession(ulong arg) => new(new NonPersistentPlayer(httpClientFactory, logger));
 
     private class PlayerGuildSession : IDisposable, IAsyncDisposable
     {
@@ -72,6 +84,16 @@ public sealed class PlayerSessionsManager : IPlayerSessionsManager
 
         public IPlayer Player { get; }
         public ulong? VoiceChannelId { get; set; }
+
+        public async ValueTask DisposeAsync()
+        {
+            await Player.DisposeAsync();
+        }
+
+        public void Dispose()
+        {
+            Player.Dispose();
+        }
 
         public async ValueTask ReattachAsync(IVoiceChannel newVoiceChannel)
         {
@@ -86,35 +108,9 @@ public sealed class PlayerSessionsManager : IPlayerSessionsManager
 
         public TrackSearchResult RespondToSearch(Guid searchId, int searchResultIndex)
         {
-            if(searches.TryRemove(searchId, out var searchResults))
+            if (searches.TryRemove(searchId, out var searchResults))
                 return searchResults[searchResultIndex];
             return default;
-        }
-
-        public void Dispose()
-        {
-            Player.Dispose();
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await Player.DisposeAsync();
-        }
-    }
-
-    public void Dispose()
-    {
-        foreach (var (_, session) in sessions)
-        {
-            session.Dispose();
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        foreach (var (_, session) in sessions)
-        {
-            await session.DisposeAsync();
         }
     }
 }
