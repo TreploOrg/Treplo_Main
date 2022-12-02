@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
@@ -9,7 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Events;
-using Treplo.Youtube;
+using Treplo.Clients;
 
 namespace Treplo;
 
@@ -21,24 +22,16 @@ internal static class Program
             .ConfigureServices((hostCtx, services) =>
             {
                 SetupDiscordBot(services, hostCtx);
-                services.AddHttpClient(nameof(YoutubeExplorer)).ConfigureHttpMessageHandlerBuilder(x =>
-                {
-                    var handler = new HttpClientHandler
-                    {
-                        UseCookies = false
-                    };
-
-                    if (handler.SupportsAutomaticDecompression)
-                        handler.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
-
-                    x.PrimaryHandler = handler;
-                });
-                services.AddSingleton<ISearchEngine, YoutubeEngine>();
-                services.AddSingleton<ISearchEngineManager, MixedSearchEngineManager>();
                 services.AddSingleton<IDateTimeManager, DateTimeManager>();
                 services.AddSingleton<IPlayerSessionsManager, PlayerSessionsManager>();
+                
+                services.Configure<SearchServiceClientSettings>(
+                    hostCtx.Configuration.GetSection(nameof(SearchServiceClientSettings)));
+                services.AddOptions<SearchServiceClientSettings>();
+                
+                services.AddTransient<ISearchServiceClient, SearchServiceClient>();
             })
-            .UseSerilog((hostingContext, services, loggerConfiguration) =>
+            .UseSerilog((hostingContext, _, loggerConfiguration) =>
             {
                 Console.OutputEncoding = Encoding.UTF8;
                 loggerConfiguration

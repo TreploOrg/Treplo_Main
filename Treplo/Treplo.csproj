@@ -42,12 +42,6 @@
         </ContentWithTargetPath>
         <None Include="external\libsodium.dll" />
 
-        <ContentWithTargetPath Include="external\YoutubeExplorer.dll">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-            <TargetPath>YoutubeExplorer.dll</TargetPath>
-        </ContentWithTargetPath>
-        <None Include="external\YoutubeExplorer.dll" />
-
         <ContentWithTargetPath Include="external\ffmpeg.exe">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <TargetPath>ffmpeg.exe</TargetPath>
@@ -56,9 +50,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Reference Include="YoutubeExplorer">
-            <HintPath>external\YoutubeExplorer.dll</HintPath>
-        </Reference>
+      <ProjectReference Include="..\Treplo.Clients\Treplo.Clients.csproj" />
+      <ProjectReference Include="..\Treplo.Common\Treplo.Common.csproj" />
     </ItemGroup>
 
 </Project>

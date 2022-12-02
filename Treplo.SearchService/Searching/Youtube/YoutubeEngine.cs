@@ -1,10 +1,11 @@
 ﻿using System.Runtime.CompilerServices;
-using Treplo.Models;
+using Treplo.Common.Models;
+using YoutubeExplorer;
 using YoutubeExplorer.Common;
 using YoutubeExplorer.Search;
 using YoutubeExplorer.Videos.Streams;
 
-namespace Treplo.Youtube;
+namespace Treplo.SearchService.Searching.Youtube;
 
 public class YoutubeEngine : ISearchEngine
 {
@@ -18,16 +19,17 @@ public class YoutubeEngine : ISearchEngine
     async IAsyncEnumerable<Track> ISearchEngine.FindInternalAsync(string query,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var client = CreateClient();
-        var result = client.Search.GetResultBatchesAsync(query, SearchFilter.Video, cancellationToken);
-        await foreach (var batch in result.WithCancellation(cancellationToken))
+        using var httpClient = clientFactory.CreateClient(nameof(YoutubeEngine));
+        var youtubeClient = new YoutubeClient(httpClient);
+        var batches = youtubeClient.Search.GetResultBatchesAsync(query, SearchFilter.Video, cancellationToken);
+        await foreach (var batch in batches.WithCancellation(cancellationToken))
         {
             var videos = batch.Items
                 .OfType<VideoSearchResult>()
                 .Where(x => x.Duration is not null)
                 .ToArray();
             var manifestTasks = videos
-                .Select(x => client.Videos.Streams.GetManifestAsync(x.Id, cancellationToken).AsTask());
+                .Select(x => youtubeClient.Videos.Streams.GetManifestAsync(x.Id, cancellationToken).AsTask());
 
             var manifests = await Task.WhenAll(manifestTasks);
 
@@ -56,10 +58,4 @@ public class YoutubeEngine : ISearchEngine
     }
 
     public string Name => "Youtube";
-
-    private YoutubeExplorer.YoutubeClient CreateClient()
-    {
-        var httpClient = clientFactory.CreateClient(nameof(YoutubeExplorer));
-        return new YoutubeExplorer.YoutubeClient(httpClient);
-    }
 }

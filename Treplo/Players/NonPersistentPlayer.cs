@@ -2,7 +2,7 @@
 using Discord;
 using Discord.Audio;
 using Serilog;
-using Treplo.Models;
+using Treplo.Common.Models;
 
 namespace Treplo.Players;
 

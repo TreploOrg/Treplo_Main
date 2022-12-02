@@ -1,22 +1,23 @@
 ﻿using Discord;
 using Discord.Interactions;
 using Serilog;
-using Treplo.Models;
+using Treplo.Clients;
+using Treplo.Common.Models;
 
 namespace Treplo;
 
 public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
 {
-    private readonly ISearchEngineManager searchEngineManager;
+    private readonly ISearchServiceClient searchServiceClient;
     private readonly IPlayerSessionsManager playerSessionsManager;
 
     private readonly ILogger logger;
 
     public PlayerModule(ILogger logger,
-        ISearchEngineManager searchEngineManager,
+        ISearchServiceClient searchServiceClient,
         IPlayerSessionsManager playerSessionsManager)
     {
-        this.searchEngineManager = searchEngineManager;
+        this.searchServiceClient = searchServiceClient;
         this.playerSessionsManager = playerSessionsManager;
         this.logger = logger.ForContext<PlayerModule>();
     }
@@ -36,7 +37,7 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
         Track? track = null;
         if (query is not null)
         {
-            var searchResult = await searchEngineManager.SearchAsync(query).FirstOrDefaultAsync();
+            var searchResult = await searchServiceClient.SearchAsync(query).FirstOrDefaultAsync();
 
             if (searchResult == default)
             {
@@ -62,7 +63,7 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
             return;
         }
 
-        var tracks = await searchEngineManager.SearchAsync(query).Take(limit).ToArrayAsync();
+        var tracks = await searchServiceClient.SearchAsync(query).Take(limit).ToArrayAsync();
         if (tracks.Length == 0)
         {
             await FollowupAsync($"Couldn't find song {query}", ephemeral: true);

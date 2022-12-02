@@ -1,9 +1,8 @@
 ﻿using System.Collections.Concurrent;
 using Discord;
-using Discord.WebSocket;
 using Serilog;
-using Treplo.Models;
 using Treplo.Players;
+using Treplo.Common.Models;
 
 namespace Treplo;
 
@@ -43,7 +42,7 @@ public sealed class PlayerSessionsManager : IPlayerSessionsManager
         var session = await GetSessionAsync(guildId);
         logger.Information("Responding to search {SearchId}", searchId);
         var searchResult = session.RespondToSearch(searchId, searchResultIndex);
-        logger.Information("Responded to search {SearchId} with resul {@SearchResult}", searchId, searchResult);
+        logger.Information("Responded to search {SearchId} with result {SearchResult}", searchId, searchResult);
         await PlayAsync(guildId, voiceChannel, searchResult.Track);
         return searchResult.Track;
     }

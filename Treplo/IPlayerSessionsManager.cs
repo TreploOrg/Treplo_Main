@@ -1,6 +1,5 @@
 ﻿using Discord;
-using Discord.WebSocket;
-using Treplo.Models;
+using Treplo.Common.Models;
 
 namespace Treplo;
 

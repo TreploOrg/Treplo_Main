@@ -1,5 +1,5 @@
 ﻿using Discord;
-using Treplo.Models;
+using Treplo.Common.Models;
 
 namespace Treplo.Players;
 

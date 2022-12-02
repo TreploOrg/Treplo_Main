@@ -1,7 +1,8 @@
 ﻿using YoutubeExplorer.Common;
 using YoutubeExplorer.Videos.Streams;
+using Models = Treplo.Common.Models;
 
-namespace Treplo.Youtube;
+namespace Treplo.SearchService.Searching.Youtube;
 
 public static class ModelsExtensions
 {

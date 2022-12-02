@@ -1,6 +1,6 @@
 ﻿using System.Text;
 using CliWrap;
-using Treplo.Models;
+using Treplo.Common.Models;
 
 namespace Treplo;
 
