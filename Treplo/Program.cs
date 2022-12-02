@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
-using Serilog.Events;
 using Treplo.Clients;
 
 namespace Treplo;
@@ -16,6 +15,8 @@ internal static class Program
 {
     public static async Task Main(string[] args)
     {
+        Log.Logger = new LoggerConfiguration()
+            .CreateBootstrapLogger();
         var hostBuilder = Host.CreateDefaultBuilder(args)
             .ConfigureServices((hostCtx, services) =>
             {
@@ -35,12 +36,7 @@ internal static class Program
             .UseSerilog((hostingContext, _, loggerConfiguration) =>
             {
                 Console.OutputEncoding = Encoding.UTF8;
-                loggerConfiguration
-                    .ReadFrom.Configuration(hostingContext.Configuration)
-                    .MinimumLevel.Override("Microsoft", LogEventLevel.Error)
-                    .MinimumLevel.Override("System", LogEventLevel.Error)
-                    .Enrich.FromLogContext()
-                    .WriteTo.Console();
+                loggerConfiguration.ReadFrom.Configuration(hostingContext.Configuration);
             });
 
         var host = hostBuilder.Build();
