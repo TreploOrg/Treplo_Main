@@ -8,12 +8,6 @@ namespace Treplo.SearchService.Helpers;
 
 public static class StartupHelpers
 {
-    public static WebApplicationBuilder AddMediatr(this WebApplicationBuilder builder)
-    {
-        builder.Services.AddMediatR(Assembly.GetExecutingAssembly());
-        return builder;
-    }
-
     public static WebApplicationBuilder AddYoutubeEngine(this WebApplicationBuilder builder)
     {
         builder.Services.AddHttpClient<YoutubeEngine>().ConfigureHttpMessageHandlerBuilder(x =>

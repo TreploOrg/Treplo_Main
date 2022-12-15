@@ -2,9 +2,11 @@
 using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Events;
+using Treplo.Clients;
 
 namespace Treplo;
 
@@ -13,8 +15,9 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
     private readonly DiscordSocketClient client;
     private readonly IDateTimeManager dateTimeManager;
     private readonly InteractionService interactionService;
-    private readonly ILogger logger;
-    private readonly IPlayerSessionsManager playerSessionsManager;
+    private readonly ILogger<DiscordBotRunner> logger;
+    private readonly PlayerServiceClient playerServiceClient;
+    private readonly SessionManager sessionManager;
     private readonly IServiceProvider serviceProvider;
     private readonly IOptions<DiscordClientSettings> settings;
 
@@ -23,18 +26,19 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
         InteractionService interactionService,
         IServiceProvider serviceProvider,
         IDateTimeManager dateTimeManager,
-        IPlayerSessionsManager playerSessionsManager,
+        SessionManager sessionManager,
         IOptions<DiscordClientSettings> settings,
-        ILogger logger
+        ILogger<DiscordBotRunner> logger
     )
     {
         this.client = client;
         this.interactionService = interactionService;
         this.serviceProvider = serviceProvider;
         this.dateTimeManager = dateTimeManager;
-        this.playerSessionsManager = playerSessionsManager;
+        this.playerServiceClient = playerServiceClient;
+        this.sessionManager = sessionManager;
         this.settings = settings;
-        this.logger = logger.ForContext<DiscordBotRunner>();
+        this.logger = logger;
 
         client.Ready += ClientOnReady;
         client.Log += ClientLog;
@@ -66,21 +70,21 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
         if (cancellationToken.IsCancellationRequested)
             return;
 
-        logger.Information("Performing graceful shutdown");
+        logger.LogInformation("Performing graceful shutdown");
         await client.LogoutAsync();
         await DisposeAsync();
     }
 
-    private static LogEventLevel GetSerilogLevel(LogSeverity logMessageSeverity)
+    private static LogLevel GetSerilogLevel(LogSeverity logMessageSeverity)
     {
         return logMessageSeverity switch
         {
-            LogSeverity.Critical => LogEventLevel.Fatal,
-            LogSeverity.Error => LogEventLevel.Error,
-            LogSeverity.Warning => LogEventLevel.Warning,
-            LogSeverity.Info => LogEventLevel.Information,
-            LogSeverity.Verbose => LogEventLevel.Verbose,
-            LogSeverity.Debug => LogEventLevel.Debug,
+            LogSeverity.Critical => LogLevel.Critical,
+            LogSeverity.Error => LogLevel.Error,
+            LogSeverity.Warning => LogLevel.Warning,
+            LogSeverity.Info => LogLevel.Information,
+            LogSeverity.Verbose => LogLevel.Trace,
+            LogSeverity.Debug => LogLevel.Debug,
             _ => throw new ArgumentOutOfRangeException(nameof(logMessageSeverity), logMessageSeverity, null),
         };
     }
@@ -90,21 +94,22 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
         await component.DeferAsync(true);
         var data = component.Data;
         var id = data.CustomId;
-        var user = component.User as IGuildUser;
-        if (id.StartsWith(IPlayerSessionsManager.SearchSelectMenuId)
-            && Guid.TryParse(id.AsSpan(IPlayerSessionsManager.SearchSelectMenuId.Length), out var searchId)
+        if (id.StartsWith("SearchSelectMenuId")
+            && Guid.TryParse(id.AsSpan("SearchSelectMenuId".Length), out var searchId)
             && component.GuildId is not null
-            && int.TryParse(data.Values.FirstOrDefault(), out var index)
+            && uint.TryParse(data.Values.FirstOrDefault(), out var index)
         )
             await Task.Factory.StartNew(async () =>
             {
-                var track = await playerSessionsManager.RespondToSearchAsync(
+                await sessionManager.RespondToSearchAsync(
                     component.GuildId.GetValueOrDefault(),
-                    user.VoiceChannel,
                     searchId,
                     index);
-                var trackTitle = track.Title;
-                await component.UpdateAsync(x => { x.Content = $"Selected track {trackTitle}"; });
+                
+                //await component.UpdateAsync(x => { x.Content = $"Selected track {trackTitle}"; });
+
+                var guildUser = component.User as IGuildUser;
+                await sessionManager.StartPlayBackAsync(component.GuildId.GetValueOrDefault(), guildUser.VoiceChannel);
             });
         else
             await component.UpdateAsync(x => { x.Content = "Something went wrong"; });
@@ -124,7 +129,7 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
     {
         if (result.IsSuccess)
         {
-            logger.Information("Successfully handled slash command {Command}", command!.Name);
+            logger.LogInformation("Successfully handled slash command {Command}", command!.Name);
             return;
         }
 
@@ -135,7 +140,7 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
 
         if (command is not null)
         {
-            logger.Error("Error occured during command \"{Command}\" handling: {ErrorType} - {ErrorMessage}",
+            logger.LogError("Error occured during command \"{Command}\" handling: {ErrorType} - {ErrorMessage}",
                 command.Name, result.Error, result.ErrorReason);
             embedBuilder.WithDescription(
                 $"Error occured during command \"{command.Name}\" handling: {result.Error!} - {result.ErrorReason}");
@@ -143,7 +148,7 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
         }
         else
         {
-            logger.Error("Error occured during command handling: {ErrorType} - {ErrorMessage}",
+            logger.LogError("Error occured during command handling: {ErrorType} - {ErrorMessage}",
                 result.Error, result.ErrorReason);
             embedBuilder.WithDescription(
                 $"Error occured during command handling: {result.Error!} - {result.ErrorReason}");
@@ -153,7 +158,7 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
 
     private async Task ClientOnInteractionCreated(SocketInteraction interaction)
     {
-        logger.Information("Received interaction: {InteractionType}", interaction.Type);
+        logger.LogInformation("Received interaction: {InteractionType}", interaction.Type);
         var interactionContext = new SocketInteractionContext(client, interaction);
         await interactionService.ExecuteCommandAsync(interactionContext, serviceProvider);
     }
@@ -164,7 +169,7 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
 
     private Task SourcedLog(LogMessage logMessage, string source)
     {
-        logger.Write(GetSerilogLevel(logMessage.Severity),
+        logger.Log(GetSerilogLevel(logMessage.Severity),
             logMessage.Exception,
             "[{ExternalSource} - {InternalSource}] {Message}",
             source,

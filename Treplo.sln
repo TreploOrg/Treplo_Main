@@ -8,6 +8,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Treplo.Clients", "Treplo.Cl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Treplo.Common", "Treplo.Common\Treplo.Common.csproj", "{9B4FFFFE-DA6C-429C-BC9A-56AC2B97DF18}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Treplo.PlayersService", "Treplo.PlayersService\Treplo.PlayersService.csproj", "{19C0E072-7125-482E-8430-69B800FD2732}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Treplo.Infrastructure", "Treplo.Infrastructure\Treplo.Infrastructure.csproj", "{C937797E-C5D3-4DD9-A41E-7FAE5384B202}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +34,13 @@ Global
 		{9B4FFFFE-DA6C-429C-BC9A-56AC2B97DF18}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9B4FFFFE-DA6C-429C-BC9A-56AC2B97DF18}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9B4FFFFE-DA6C-429C-BC9A-56AC2B97DF18}.Release|Any CPU.Build.0 = Release|Any CPU
+		{19C0E072-7125-482E-8430-69B800FD2732}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{19C0E072-7125-482E-8430-69B800FD2732}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{19C0E072-7125-482E-8430-69B800FD2732}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{19C0E072-7125-482E-8430-69B800FD2732}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C937797E-C5D3-4DD9-A41E-7FAE5384B202}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C937797E-C5D3-4DD9-A41E-7FAE5384B202}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C937797E-C5D3-4DD9-A41E-7FAE5384B202}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C937797E-C5D3-4DD9-A41E-7FAE5384B202}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

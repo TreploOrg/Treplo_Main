@@ -9,17 +9,17 @@ namespace Treplo;
 public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
 {
     private readonly ILogger logger;
-    private readonly IPlayerSessionsManager playerSessionsManager;
     private readonly ISearchServiceClient searchServiceClient;
+    private readonly SessionManager sessionManager;
 
     public PlayerModule(
         ILogger logger,
         ISearchServiceClient searchServiceClient,
-        IPlayerSessionsManager playerSessionsManager
+        SessionManager sessionManager
     )
     {
         this.searchServiceClient = searchServiceClient;
-        this.playerSessionsManager = playerSessionsManager;
+        this.sessionManager = sessionManager;
         this.logger = logger.ForContext<PlayerModule>();
     }
 
@@ -38,7 +38,7 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
         Track? track = null;
         if (query is not null)
         {
-            var searchResult = await searchServiceClient.SearchAsync(query).FirstOrDefaultAsync();
+            var searchResult = await searchServiceClient.SearchAsync(query, 1).FirstOrDefaultAsync();
 
             if (searchResult == default)
             {
@@ -49,7 +49,8 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
             track = searchResult.Track;
         }
 
-        await playerSessionsManager.PlayAsync(Context.Guild.Id, voiceChannel, track);
+        await sessionManager.EnqueueAsync(Context.Guild.Id, new TrackRequest(track.GetValueOrDefault(), StreamFormat));
+        await sessionManager.StartPlayBackAsync(Context.Guild.Id, voiceChannel);
         await FollowupAsync("Starting playback");
     }
 
@@ -71,10 +72,12 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
             return;
         }
 
-        var searchId = await playerSessionsManager.StartSearchAsync(Context.Guild.Id, voiceChannel, tracks);
+        var tracksRequest = tracks.Select(x => new TrackRequest(x.Track, StreamFormat));
+
+        var searchId = await sessionManager.StartSearchAsync(Context.Guild.Id, tracksRequest.ToArray());
         var componentBuilder = new ComponentBuilder()
             .WithSelectMenu(
-                $"{IPlayerSessionsManager.SearchSelectMenuId}{searchId}",
+                $"SearchSelectMenuId{searchId}",
                 tracks
                     .Select((x, i) => new SelectMenuOptionBuilder(x.Track.Title, i.ToString(),
                         $"{x.Track.Author}. {x.SearchEngineName}"))
@@ -82,4 +85,6 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
             );
         await FollowupAsync("Select a song to enqueue", components: componentBuilder.Build());
     }
+
+    private StreamFormatRequest StreamFormat { get; } = new(2, new Container("s16le"), null, Frequency: 48000);
 }

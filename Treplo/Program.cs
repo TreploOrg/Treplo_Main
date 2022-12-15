@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Treplo.Clients;
+using Treplo.Infrastructure;
 
 namespace Treplo;
 
@@ -18,20 +19,18 @@ internal static class Program
         Log.Logger = new LoggerConfiguration()
             .CreateBootstrapLogger();
         var hostBuilder = Host.CreateDefaultBuilder(args)
+            .BindOption<SearchServiceClientSettings>()
+            .BindOption<PlayerServiceClientSettings>()
+            .BindOption<DiscordClientSettings>()
             .ConfigureServices((hostCtx, services) =>
             {
                 services.AddHttpClient();
                 SetupDiscordBot(services, hostCtx);
                 services.AddSingleton<IDateTimeManager, DateTimeManager>();
-                services
-                    .AddSingleton<IPlayerSessionsManager, PlayerSessionsManager>();
-
-                services.Configure<SearchServiceClientSettings>(
-                    hostCtx.Configuration
-                        .GetSection(nameof(SearchServiceClientSettings)));
-                services.AddOptions<SearchServiceClientSettings>();
 
                 services.AddTransient<ISearchServiceClient, SearchServiceClient>();
+                services.AddSingleton<PlayerServiceClient>();
+                services.AddSingleton<SessionManager>();
             })
             .UseSerilog((hostingContext, _, loggerConfiguration) =>
             {
@@ -46,9 +45,6 @@ internal static class Program
 
     private static void SetupDiscordBot(IServiceCollection services, HostBuilderContext hostCtx)
     {
-        services.Configure<DiscordClientSettings>(
-            hostCtx.Configuration.GetSection(nameof(DiscordClientSettings)));
-        services.AddOptions<DiscordClientSettings>();
         services.AddSingleton(ctx =>
         {
             var settings = ctx.GetRequiredService<IOptions<DiscordClientSettings>>();
