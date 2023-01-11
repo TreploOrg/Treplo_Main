@@ -1,88 +1,52 @@
 ﻿using System.Collections.Concurrent;
-using Discord;
-using Discord.Audio;
-using Serilog;
+using Discord.WebSocket;
+using Microsoft.Extensions.Logging;
 using Treplo.Clients;
-using Treplo.Common.Models;
 
 namespace Treplo;
 
-public sealed class SessionManager
+//TODO: Orleans would be more reliable way to handle this then we'll need replication
+public sealed class SessionManager: IDisposable
 {
+    private readonly IClusterClient clusterClient;
+    private readonly DiscordSocketClient discordSocketClient;
     private readonly PlayerServiceClient playerServiceClient;
-    private readonly ConcurrentDictionary<ulong, PlaybackSession> sessions = new();
+    private readonly ILoggerFactory loggerFactory;
+    private readonly ConcurrentDictionary<ulong, Session> sessions = new();
 
-    public SessionManager(PlayerServiceClient playerServiceClient)
+    public SessionManager(
+        IClusterClient clusterClient,
+        DiscordSocketClient discordSocketClient,
+        PlayerServiceClient playerServiceClient,
+        ILoggerFactory loggerFactory
+    )
     {
+        this.clusterClient = clusterClient;
+        this.discordSocketClient = discordSocketClient;
         this.playerServiceClient = playerServiceClient;
+        this.loggerFactory = loggerFactory;
     }
 
-    public async ValueTask StartPlayBackAsync(ulong guildId, IVoiceChannel voiceChannel)
+    public Session GetSession(ulong sessionId)
     {
-        var session = GetSession(guildId);
-        await session.TryAttachAsync(voiceChannel, id => playerServiceClient.PlayAsync(id));
+        return sessions.GetOrAdd(sessionId,
+            static (id, args) =>
+                new Session(
+                    id,
+                    args.clusterClient,
+                    args.discordSocketClient,
+                    args.playerServiceClient,
+                    args.logger
+                ),
+            (clusterClient, discordSocketClient, playerServiceClient, logger: loggerFactory.CreateLogger<Session>())
+        );
     }
 
-    private PlaybackSession GetSession(ulong id)
+    public void Dispose()
     {
-        return sessions.GetOrAdd(id, static id => new PlaybackSession(id));
-    }
-
-    public async Task RespondToSearchAsync(ulong guildId, Guid searchId, uint index)
-    {
-        await playerServiceClient.RespondToSearchAsync(guildId, searchId, index);
-    }
-
-    public async Task EnqueueAsync(ulong guildId, TrackRequest track)
-    {
-        await playerServiceClient.EnqueueAsync(guildId, track);
-    }
-
-    public async Task<Guid> StartSearchAsync(ulong guildId, TrackRequest[] trackRequests)
-    {
-        return await playerServiceClient.StartSearchAsync(guildId, trackRequests);
-    }
-}
-
-public sealed class PlaybackSession
-{
-    private readonly ulong id;
-    private IVoiceChannel? currentVoiceChannel;
-
-    private Task? playbackTask;
-
-    public PlaybackSession(ulong id)
-    {
-        this.id = id;
-    }
-
-    public async ValueTask TryAttachAsync(IVoiceChannel voiceChannel, Func<ulong, Task<Stream>> streamFactory)
-    {
-        if (currentVoiceChannel?.Id == voiceChannel.Id && playbackTask is not null)
-            return;
-
-        currentVoiceChannel = voiceChannel;
-        
-        playbackTask = Core();
-
-
-        async Task Core()
+        foreach (var (_, session) in sessions)
         {
-            try
-            {
-                await using var currentStream = await streamFactory(id);
-                using var client = await voiceChannel.ConnectAsync();
-                await using var opusStream = client.CreatePCMStream(AudioApplication.Music);
-                await currentStream.CopyToAsync(opusStream);
-            }
-            catch (Exception e)
-            {
-                Log.Error(e, "error in session");
-            }
-            finally
-            {
-                playbackTask = null;
-            }
+            session.Dispose();
         }
     }
 }

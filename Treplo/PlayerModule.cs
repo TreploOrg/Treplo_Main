@@ -1,6 +1,6 @@
 ﻿using Discord;
 using Discord.Interactions;
-using Serilog;
+using Microsoft.Extensions.Logging;
 using Treplo.Clients;
 using Treplo.Common.Models;
 
@@ -8,19 +8,19 @@ namespace Treplo;
 
 public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
 {
-    private readonly ILogger logger;
-    private readonly ISearchServiceClient searchServiceClient;
+    private readonly ILogger<PlayerModule> logger;
+    private readonly SearchServiceClient searchServiceClient;
     private readonly SessionManager sessionManager;
 
     public PlayerModule(
-        ILogger logger,
-        ISearchServiceClient searchServiceClient,
-        SessionManager sessionManager
+        SearchServiceClient searchServiceClient,
+        SessionManager sessionManager,
+        ILogger<PlayerModule> logger
     )
     {
         this.searchServiceClient = searchServiceClient;
         this.sessionManager = sessionManager;
-        this.logger = logger.ForContext<PlayerModule>();
+        this.logger = logger;
     }
 
     [SlashCommand("play", "Enqueues first song found for provided query or starts playback if no query is provided",
@@ -48,9 +48,10 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
 
             track = searchResult.Track;
         }
-
-        await sessionManager.EnqueueAsync(Context.Guild.Id, new TrackRequest(track.GetValueOrDefault(), StreamFormat));
-        await sessionManager.StartPlayBackAsync(Context.Guild.Id, voiceChannel);
+        
+        var session = sessionManager.GetSession(Context.Guild.Id);
+        await session.Enqueue(track.GetValueOrDefault());
+        await session.StartPlay(voiceChannel.Id);
         await FollowupAsync("Starting playback");
     }
 
@@ -71,10 +72,12 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
             await FollowupAsync($"Couldn't find song {query}", ephemeral: true);
             return;
         }
+        
+        var session = sessionManager.GetSession(Context.Guild.Id);
 
-        var tracksRequest = tracks.Select(x => new TrackRequest(x.Track, StreamFormat));
+        var tracksRequest = tracks.Select(x => x.Track);
 
-        var searchId = await sessionManager.StartSearchAsync(Context.Guild.Id, tracksRequest.ToArray());
+        var searchId = await session.StartSearch(tracksRequest.ToArray());
         var componentBuilder = new ComponentBuilder()
             .WithSelectMenu(
                 $"SearchSelectMenuId{searchId}",
@@ -85,6 +88,4 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
             );
         await FollowupAsync("Select a song to enqueue", components: componentBuilder.Build());
     }
-
-    private StreamFormatRequest StreamFormat { get; } = new(2, new Container("s16le"), null, Frequency: 48000);
 }

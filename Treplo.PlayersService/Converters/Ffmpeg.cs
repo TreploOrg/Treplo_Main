@@ -12,12 +12,12 @@ public sealed class Ffmpeg
     private readonly StringBuilder errorBuilder;
     private readonly Command command;
 
-    public Ffmpeg(string path, StreamInfo inStreamInfo, StreamFormatRequest requiredFormat)
+    public Ffmpeg(string path, in StreamInfo inStreamInfo, in StreamFormatRequest requiredFormat)
     {
         errorBuilder = new StringBuilder();
         command = Cli.Wrap(path)
             .WithValidation(CommandResultValidation.None)
-            .WithArguments(GetArguments(inStreamInfo, requiredFormat))
+            .WithArguments(GetArguments(in inStreamInfo, in requiredFormat))
             .WithStandardInputPipe(PipeSource.Create((destination, cancellationToken)
                 => inputPipe.Reader.CopyToAsync(destination, cancellationToken)))
             .WithStandardErrorPipe(PipeTarget.ToStringBuilder(errorBuilder))
@@ -46,7 +46,7 @@ public sealed class Ffmpeg
         }
     }
 
-    private static string GetArguments(StreamInfo inStreamInfo, StreamFormatRequest requiredFormat)
+    private static string GetArguments(in StreamInfo inStreamInfo, in StreamFormatRequest requiredFormat)
     {
         var argumentString = new StringBuilder("-hide_banner -loglevel error ");
 
@@ -57,11 +57,11 @@ public sealed class Ffmpeg
 
         argumentString.Append("-i - ");
 
-        AppendStreamRequest(requiredFormat, argumentString);
+        AppendStreamRequest(in requiredFormat, argumentString);
 
         return argumentString.Append('-').ToString();
 
-        static void AppendStreamRequest(StreamFormatRequest streamFormatRequest, StringBuilder stringBuilder)
+        static void AppendStreamRequest(in StreamFormatRequest streamFormatRequest, StringBuilder stringBuilder)
         {
             if (streamFormatRequest.Channels is { } channels)
                 stringBuilder.Append($"-ac {channels} ");

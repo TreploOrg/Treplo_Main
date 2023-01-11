@@ -8,6 +8,10 @@
 
     <ItemGroup>
         <PackageReference Include="CliWrap" Version="3.5.0" />
+        <PackageReference Include="Microsoft.Orleans.Core" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Orleans.Server" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Orleans.Streaming" Version="7.0.0" />
         <PackageReference Include="Serilog.Enrichers.Environment" Version="2.2.0" />
         <PackageReference Include="Serilog.Enrichers.Thread" Version="3.1.0" />
     </ItemGroup>
@@ -15,6 +19,7 @@
     <ItemGroup>
         <ProjectReference Include="..\Treplo.Common\Treplo.Common.csproj" />
         <ProjectReference Include="..\Treplo.Infrastructure\Treplo.Infrastructure.csproj" />
+        <ProjectReference Include="..\Treplo.PlayersService.Interfaces\Treplo.PlayersService.Interfaces.csproj" />
         <ProjectReference Include="..\Treplo.SearchService\Treplo.SearchService.csproj" />
     </ItemGroup>
 

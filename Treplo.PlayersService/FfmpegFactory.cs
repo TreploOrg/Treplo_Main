@@ -13,9 +13,9 @@ public sealed class FfmpegFactory
         this.options = options;
     }
 
-    public Ffmpeg Create(StreamInfo inStreamInfo, StreamFormatRequest requiredFormat)
+    public Ffmpeg Create(in StreamInfo inStreamInfo, in StreamFormatRequest requiredFormat)
     {
-        return new Ffmpeg(options.Value.Path, inStreamInfo, requiredFormat);
+        return new Ffmpeg(options.Value.Path, in inStreamInfo, in requiredFormat);
     }
 }
 

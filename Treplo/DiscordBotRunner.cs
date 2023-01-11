@@ -14,10 +14,9 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
 {
     private readonly DiscordSocketClient client;
     private readonly IDateTimeManager dateTimeManager;
+    private readonly SessionManager sessionManager;
     private readonly InteractionService interactionService;
     private readonly ILogger<DiscordBotRunner> logger;
-    private readonly PlayerServiceClient playerServiceClient;
-    private readonly SessionManager sessionManager;
     private readonly IServiceProvider serviceProvider;
     private readonly IOptions<DiscordClientSettings> settings;
 
@@ -35,7 +34,6 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
         this.interactionService = interactionService;
         this.serviceProvider = serviceProvider;
         this.dateTimeManager = dateTimeManager;
-        this.playerServiceClient = playerServiceClient;
         this.sessionManager = sessionManager;
         this.settings = settings;
         this.logger = logger;
@@ -101,15 +99,22 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
         )
             await Task.Factory.StartNew(async () =>
             {
-                await sessionManager.RespondToSearchAsync(
-                    component.GuildId.GetValueOrDefault(),
-                    searchId,
-                    index);
+                try
+                {
+                    var session = sessionManager.GetSession(component.GuildId.GetValueOrDefault());
+                    var track = await session.EndSearch(searchId, index);
+                    var trackTitle = track.Title;
                 
-                //await component.UpdateAsync(x => { x.Content = $"Selected track {trackTitle}"; });
+                    await component.UpdateAsync(x => x.Content = $"Selected track {trackTitle}");
 
-                var guildUser = component.User as IGuildUser;
-                await sessionManager.StartPlayBackAsync(component.GuildId.GetValueOrDefault(), guildUser.VoiceChannel);
+                    var guildUser = component.User as IGuildUser;
+                    await session.StartPlay(guildUser.VoiceChannel.Id);
+                }
+                catch (Exception e)
+                {
+                    logger.LogError(e, "Error during search responding");
+                    throw;
+                }
             });
         else
             await component.UpdateAsync(x => { x.Content = "Something went wrong"; });

@@ -7,7 +7,13 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="7.0.0" />
       <PackageReference Include="Microsoft.Orleans.Sdk" Version="7.0.0" />
+      <PackageReference Include="Microsoft.Orleans.Streaming" Version="7.0.0" />
     </ItemGroup>
-    
+
+    <ItemGroup>
+      <ProjectReference Include="..\Treplo.Common\Treplo.Common.csproj" />
+    </ItemGroup>
+
 </Project>

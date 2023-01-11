@@ -5,16 +5,7 @@ using Treplo.Common.Models;
 
 namespace Treplo.Clients;
 
-public interface ISearchServiceClient
-{
-    IAsyncEnumerable<TrackSearchResult> SearchAsync(
-        string query,
-        uint? limit = null,
-        CancellationToken cancellationToken = default
-    );
-}
-
-public class SearchServiceClient : ISearchServiceClient
+public class SearchServiceClient
 {
     private readonly HttpClient httpClient;
     private readonly JsonSerializerOptions jsonSerializerOptions;

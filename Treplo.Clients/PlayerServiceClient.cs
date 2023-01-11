@@ -1,4 +1,5 @@
 ﻿using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Treplo.Common.Models;
 
@@ -7,71 +8,35 @@ namespace Treplo.Clients;
 public sealed class PlayerServiceClient
 {
     private readonly IHttpClientFactory httpClientFactory;
-    private readonly string requestUri;
+    private readonly string url;
+    private readonly JsonSerializerOptions jsonSerializerOptions;
 
-    public PlayerServiceClient(IHttpClientFactory httpClientFactory, IOptions<PlayerServiceClientSettings> options)
+    public PlayerServiceClient(IOptions<PlayerServiceClientSettings> setting, IHttpClientFactory httpClientFactory)
     {
         this.httpClientFactory = httpClientFactory;
-        requestUri = $"{options.Value.ServiceUrl}";
+        url = setting.Value.PlaybackEndpointUrl + "/play";
+        var preset = setting.Value.JsonSerializerPreset;
+        if (preset is { } actualPreset)
+            jsonSerializerOptions = new JsonSerializerOptions(actualPreset);
+        else
+            jsonSerializerOptions = JsonSerializerOptions.Default;
     }
 
-    public async Task<Stream> PlayAsync(
-        ulong sessionId,
-        CancellationToken cancellationToken = default
-    )
+    public async Task<Stream> GetAudioStream(StreamInfo streamInfo, StreamFormatRequest streamFormatRequest, CancellationToken cancellationToken = default)
     {
-        using var httpClient = httpClientFactory.CreateClient();
-        using var content = JsonContent.Create(new { sessionId });
-        using var message = new HttpRequestMessage(HttpMethod.Post, $"{requestUri}/play")
+        using var httpClient = httpClientFactory.CreateClient(nameof(PlayerServiceClient));
+        using var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
-            Content = content,
+            Content = JsonContent.Create(new
+            {
+                StreamInfo = streamInfo, 
+                FormatRequest = streamFormatRequest,
+            }, options: jsonSerializerOptions),
         };
-        var response = await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+        //TODO: research whether or not response is disposed with its content stream and, if it's not, check if it is ok to let finalizers do their work or to make a stream wrapper
+        var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
         return await response.Content.ReadAsStreamAsync(cancellationToken);
     }
-
-    public async Task<Guid> StartSearchAsync(
-        ulong sessionId,
-        TrackRequest[] searchTracks,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var httpClient = httpClientFactory.CreateClient();
-        var result = await httpClient.PostAsJsonAsync($"{requestUri}/search-start",
-            new { sessionId, searchTracks }, cancellationToken
-        );
-        result.EnsureSuccessStatusCode();
-
-        var guid = await result.Content.ReadAsStringAsync(cancellationToken);
-        return Guid.Parse(guid.AsSpan()[1..^1]);
-    }
-
-    public async Task RespondToSearchAsync(
-        ulong sessionId,
-        Guid searchSessionId,
-        uint searchResultIndex,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var httpClient = httpClientFactory.CreateClient();
-        var result = await httpClient.PostAsJsonAsync($"{requestUri}/search-respond",
-            new { sessionId, searchSessionId, searchResultIndex }, cancellationToken
-        );
-
-        result.EnsureSuccessStatusCode();
-    }
-
-    public async Task EnqueueAsync(ulong sessionId, TrackRequest track, CancellationToken cancellationToken = default)
-    {
-        using var httpClient = httpClientFactory.CreateClient();
-        var result = await httpClient.PostAsJsonAsync($"{requestUri}/enqueue", new { sessionId, track },
-            cancellationToken);
-
-        result.EnsureSuccessStatusCode();
-    }
-}
-
-public class PlayerServiceClientSettings
-{
-    public required string ServiceUrl { get; init; }
 }

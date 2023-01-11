@@ -22,13 +22,18 @@ internal static class Program
             .BindOption<SearchServiceClientSettings>()
             .BindOption<PlayerServiceClientSettings>()
             .BindOption<DiscordClientSettings>()
+            .UseOrleansClient(siloBuilder =>
+            {
+                //TODO: need way of configuring cluster endpoints, id and service id
+                siloBuilder.UseLocalhostClustering();
+            })
             .ConfigureServices((hostCtx, services) =>
             {
                 services.AddHttpClient();
                 SetupDiscordBot(services, hostCtx);
                 services.AddSingleton<IDateTimeManager, DateTimeManager>();
 
-                services.AddTransient<ISearchServiceClient, SearchServiceClient>();
+                services.AddTransient<SearchServiceClient>();
                 services.AddSingleton<PlayerServiceClient>();
                 services.AddSingleton<SessionManager>();
             })
