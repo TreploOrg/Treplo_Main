@@ -8,7 +8,7 @@ using Treplo.PlayersService.Interfaces;
 
 namespace Treplo;
 
-public sealed class Session : IDisposable
+public sealed class Session : IAsyncDisposable
 {
     private static readonly StreamFormatRequest StreamFormat = new()
     {
@@ -25,7 +25,7 @@ public sealed class Session : IDisposable
     private readonly PlayerServiceClient playerServiceClient;
     private readonly ILogger<Session> logger;
 
-    private CancellationTokenSource cts = new();
+    private CancellationTokenSource? cts = new();
     private Task? playbackTask;
     private ulong? currentVoiceChannel;
 
@@ -60,11 +60,12 @@ public sealed class Session : IDisposable
         async Task StartPlayback(IPlayerGrain playerGrain, IAudioChannel voiceChannel, CancellationToken cancellationToken)
         {
             using var audioClient = await voiceChannel.ConnectAsync(selfDeaf: true);
-            var audioOutStream = audioClient.CreatePCMStream(AudioApplication.Music, (int?)StreamFormat.Frequency);
-            audioClient.Disconnected += async _ =>
+            await using var audioOutStream = audioClient.CreatePCMStream(AudioApplication.Music);
+            audioClient.Disconnected += _ =>
             {
-                await audioOutStream.DisposeAsync();
+                FireCts();
                 currentVoiceChannel = null;
+                return Task.CompletedTask;
             };
             try
             {
@@ -73,26 +74,34 @@ public sealed class Session : IDisposable
                     await using var audioInStream =
                         await playerServiceClient.GetAudioStream(track.Source, StreamFormat, cancellationToken);
                     await audioInStream.CopyToAsync(audioOutStream, cancellationToken);
+                    await audioOutStream.FlushAsync(cancellationToken);
 
                     //TODO: probably need settings for this
                     await Task.Delay(1000, cancellationToken);
                 }
             }
             catch (TaskCanceledException)
-            {
-            }
+            { }
+            catch (OperationCanceledException)
+            { }
             catch (Exception e)
             {
                 logger.LogError(e, "Error during playback in session {SessionId}", id);
             }
             finally
             {
-                await audioOutStream.FlushAsync(cancellationToken);
                 await audioClient.StopAsync();
             }
         }
     }
-    
+
+    private void FireCts(bool recreate = true)
+    {
+        cts?.Cancel();
+        cts?.Dispose();
+        cts = recreate ? new CancellationTokenSource() : null;
+    }
+
     public async ValueTask<Guid> StartSearch(Track[] searchTracks)
     {
         var player = clusterClient.GetGrain<IPlayerGrain>(id);
@@ -113,20 +122,21 @@ public sealed class Session : IDisposable
 
     public async ValueTask Pause()
     {
-        cts.Cancel();
+        FireCts();
         if(playbackTask is not null)
             await playbackTask;
         playbackTask = null;
         currentVoiceChannel = null;
-        cts.Dispose();
-        cts = new CancellationTokenSource();
     }
-
-    public void Dispose()
+   
+    public async ValueTask DisposeAsync()
     {
-        cts.Cancel();
-        cts.Dispose();
-        
+        FireCts(false);
+
+        if (playbackTask is null)
+            return;
+
+        await playbackTask;
         playbackTask = null;
     }
 }

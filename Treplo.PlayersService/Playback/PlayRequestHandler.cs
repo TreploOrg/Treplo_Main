@@ -63,7 +63,7 @@ public sealed class PlayRequestHandler : IRequestHandler<PlayRequest, IResult>
         }
         finally
         {
-            await ffmpeg.Output.CompleteAsync(exception);
+            await ffmpeg.Input.CompleteAsync(exception);
             logger.LogDebug("Playback finished");
         }
     }

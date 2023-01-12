@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Treplo.Infrastructure;
 using Treplo.Infrastructure.AspNet;
+using Treplo.Infrastructure.Configuration;
 using Treplo.PlayersService;
 using Treplo.PlayersService.Playback;
 
@@ -29,4 +30,4 @@ app.MapPost("/play",
         => await mediator.Send(request, cancellationToken)
         );
 
-app.Run();
+await app.RunAsync();

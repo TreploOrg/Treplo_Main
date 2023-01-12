@@ -6,7 +6,7 @@ using Treplo.Clients;
 namespace Treplo;
 
 //TODO: Orleans would be more reliable way to handle this then we'll need replication
-public sealed class SessionManager: IDisposable
+public sealed class SessionManager : IAsyncDisposable
 {
     private readonly IClusterClient clusterClient;
     private readonly DiscordSocketClient discordSocketClient;
@@ -41,12 +41,9 @@ public sealed class SessionManager: IDisposable
             (clusterClient, discordSocketClient, playerServiceClient, logger: loggerFactory.CreateLogger<Session>())
         );
     }
-
-    public void Dispose()
+    
+    public async ValueTask DisposeAsync()
     {
-        foreach (var (_, session) in sessions)
-        {
-            session.Dispose();
-        }
+        await Task.WhenAll(sessions.Select(x => x.Value.DisposeAsync().AsTask()));
     }
 }

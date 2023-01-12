@@ -3,12 +3,13 @@ using System.Text;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Treplo.Clients;
-using Treplo.Infrastructure;
+using Treplo.Infrastructure.Configuration;
 
 namespace Treplo;
 
@@ -22,26 +23,33 @@ internal static class Program
             .BindOption<SearchServiceClientSettings>()
             .BindOption<PlayerServiceClientSettings>()
             .BindOption<DiscordClientSettings>()
-            .UseOrleansClient(siloBuilder =>
-            {
-                //TODO: need way of configuring cluster endpoints, id and service id
-                siloBuilder.UseLocalhostClustering();
-            })
-            .ConfigureServices((hostCtx, services) =>
-            {
-                services.AddHttpClient();
-                SetupDiscordBot(services, hostCtx);
-                services.AddSingleton<IDateTimeManager, DateTimeManager>();
+            .UseOrleansClient(
+                siloBuilder =>
+                {
+                    //TODO: need way of configuring cluster endpoints, id and service id
+                    siloBuilder.UseLocalhostClustering();
+                }
+            )
+            .ConfigureServices(
+                (hostCtx, services) =>
+                {
+                    services.AddHttpClient();
+                    SetupDiscordBot(services, hostCtx);
+                    services.AddSingleton<IDateTimeManager, DateTimeManager>();
 
-                services.AddTransient<SearchServiceClient>();
-                services.AddSingleton<PlayerServiceClient>();
-                services.AddSingleton<SessionManager>();
-            })
-            .UseSerilog((hostingContext, _, loggerConfiguration) =>
-            {
-                Console.OutputEncoding = Encoding.UTF8;
-                loggerConfiguration.ReadFrom.Configuration(hostingContext.Configuration);
-            });
+                    services.AddTransient<SearchServiceClient>();
+                    services.AddSingleton<PlayerServiceClient>();
+                    services.AddSingleton<SessionManager>();
+                }
+            )
+            .UseSerilog(
+                (hostingContext, _, loggerConfiguration) =>
+                {
+                    Console.OutputEncoding = Encoding.UTF8;
+                    loggerConfiguration.ReadFrom.Configuration(hostingContext.Configuration);
+                }
+            )
+            .ConfigureAppConfiguration(x => x.AddUserSecrets(Assembly.GetExecutingAssembly(), true));
 
         var host = hostBuilder.Build();
 
@@ -50,19 +58,26 @@ internal static class Program
 
     private static void SetupDiscordBot(IServiceCollection services, HostBuilderContext hostCtx)
     {
-        services.AddSingleton(ctx =>
-        {
-            var settings = ctx.GetRequiredService<IOptions<DiscordClientSettings>>();
-            var client = new DiscordSocketClient(new DiscordSocketConfig
+        services.AddSingleton(
+            ctx =>
             {
-                GatewayIntents = settings.Value.Intents
-                    .Aggregate(GatewayIntents.None,
-                        (seed, cur) => seed | cur),
-            });
+                var settings = ctx.GetRequiredService<IOptions<DiscordClientSettings>>();
+                var client = new DiscordSocketClient(
+                    new DiscordSocketConfig
+                    {
+                        GatewayIntents = settings.Value.Intents
+                            .Aggregate(
+                                GatewayIntents.None,
+                                (seed, cur) => seed | cur
+                            ),
+                    }
+                );
 
-            return client;
-        });
-        services.AddSingleton(ctx =>
+                return client;
+            }
+        );
+        services.AddSingleton(
+            ctx =>
             {
                 var interactionService =
                     new InteractionService(ctx.GetRequiredService<DiscordSocketClient>());

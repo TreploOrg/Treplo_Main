@@ -24,4 +24,4 @@ app.MapGet("/search",
         mediatr.CreateStream(request, cancellationToken)
 );
 
-app.Run();
+await app.RunAsync();

@@ -8,6 +8,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Treplo.Common\Treplo.Common.csproj" />
+        <ProjectReference Include="..\Treplo.Infrastructure\Treplo.Infrastructure.csproj" />
     </ItemGroup>
 
     <ItemGroup>

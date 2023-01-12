@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Options;
 using Treplo.Common.Models;
+using Treplo.Infrastructure.Configuration;
 using Treplo.PlayersService.Converters;
 
 namespace Treplo.PlayersService;
@@ -19,7 +20,9 @@ public sealed class FfmpegFactory
     }
 }
 
-public sealed class FfmpegSettings
+public sealed class FfmpegSettings : ISetting
 {
     public required string Path { get; init; }
+
+    public static string SectionName => nameof(FfmpegSettings);
 }
