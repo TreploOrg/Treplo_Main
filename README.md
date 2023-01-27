@@ -30,5 +30,8 @@ ffmpeg - обработка аудио
 ## Планы ##
 В планах поиск в spotify, soundcloud, yandex music, а также создание собственных плейлистов и воспроизведение локальных файлов
 
+## Взаимодействие между сервисами ##
+![interactions drawio](https://user-images.githubusercontent.com/81422677/215156327-20680b49-51cd-4cdd-a03c-0e1f459fd6d5.png)
+
 ## Роадмап ##
 ![roadmap](https://user-images.githubusercontent.com/81422717/215155762-890e10bc-4319-4873-b473-7bd2ca4c1b66.png)
