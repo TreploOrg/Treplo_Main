@@ -23,3 +23,7 @@
 
 ## Планы ##
 В планах поиск в spotify, soundcloud, yandex music, а также создание собственных плейлистов и воспроизведение локальных файлов
+
+## Взаимодействие между сервисами ##
+
+![interactions drawio](https://user-images.githubusercontent.com/81422677/215156327-20680b49-51cd-4cdd-a03c-0e1f459fd6d5.png)
