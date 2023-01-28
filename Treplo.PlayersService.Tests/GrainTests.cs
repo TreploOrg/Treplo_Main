@@ -13,7 +13,7 @@ public class Tests
     private readonly Fixture fixture = new();
     private PlayerGrain grain = null!;
 
-    [Test]
+    [SetUp]
     public void Setup()
     {
         grain = new PlayerGrain(fakeLogger);
@@ -64,8 +64,7 @@ public class Tests
             
             actual.Add((Track)t);
         }
-
-        actual.Reverse();
+        
         actual.Should().Equal(tracks);
     }
     
