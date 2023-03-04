@@ -4,9 +4,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Treplo", "Treplo\Treplo.csp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Treplo.SearchService", "Treplo.SearchService\Treplo.SearchService.csproj", "{2C60E230-9E05-4368-9286-7F7EC26EF474}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Treplo.Clients", "Treplo.Clients\Treplo.Clients.csproj", "{D43E9AC5-0198-4971-977A-02E120640A26}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Treplo.Common", "Treplo.Common\Treplo.Common.csproj", "{9B4FFFFE-DA6C-429C-BC9A-56AC2B97DF18}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Treplo.Common.OrleansGrpcConnector", "Treplo.Common.OrleansGrpcConnector\Treplo.Common.OrleansGrpcConnector.csproj", "{9B4FFFFE-DA6C-429C-BC9A-56AC2B97DF18}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Treplo.PlayersService", "Treplo.PlayersService\Treplo.PlayersService.csproj", "{19C0E072-7125-482E-8430-69B800FD2732}"
 EndProject
@@ -28,10 +26,6 @@ Global
 		{2C60E230-9E05-4368-9286-7F7EC26EF474}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2C60E230-9E05-4368-9286-7F7EC26EF474}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2C60E230-9E05-4368-9286-7F7EC26EF474}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D43E9AC5-0198-4971-977A-02E120640A26}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D43E9AC5-0198-4971-977A-02E120640A26}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D43E9AC5-0198-4971-977A-02E120640A26}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D43E9AC5-0198-4971-977A-02E120640A26}.Release|Any CPU.Build.0 = Release|Any CPU
 		{9B4FFFFE-DA6C-429C-BC9A-56AC2B97DF18}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{9B4FFFFE-DA6C-429C-BC9A-56AC2B97DF18}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9B4FFFFE-DA6C-429C-BC9A-56AC2B97DF18}.Release|Any CPU.ActiveCfg = Release|Any CPU

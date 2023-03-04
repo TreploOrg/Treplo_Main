@@ -1,4 +1,5 @@
-﻿namespace Treplo.Common.Models;
+﻿using Treplo.Common;
 
-[GenerateSerializer]
+namespace Treplo.Converters;
+
 public readonly record struct StreamFormatRequest(uint? Channels, Container? Container, Codec? Codec, uint? Frequency);

@@ -8,7 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
-using Treplo.Clients;
+using Treplo.Common.OrleansGrpcConnector;
+using Treplo.Infrastructure.AspNet;
 using Treplo.Infrastructure.Configuration;
 
 namespace Treplo;
@@ -17,38 +18,41 @@ internal static class Program
 {
     public static async Task Main(string[] args)
     {
-        Log.Logger = new LoggerConfiguration()
-            .CreateBootstrapLogger();
         var hostBuilder = Host.CreateDefaultBuilder(args)
+            .BindOption<FfmpegSettings>()
             .BindOption<SearchServiceClientSettings>()
             .BindOption<PlayerServiceClientSettings>()
             .BindOption<DiscordClientSettings>()
-            .UseOrleansClient(
-                siloBuilder =>
-                {
-                    //TODO: need way of configuring cluster endpoints, id and service id
-                    siloBuilder.UseLocalhostClustering();
-                }
+            .UseOrleans(
+                siloBuilder => siloBuilder.UseLocalhostClustering()
+                    .AddMemoryGrainStorageAsDefault()
             )
             .ConfigureServices(
                 (hostCtx, services) =>
                 {
-                    services.AddHttpClient();
+                    services.AddConverters()
+                        .AddSingleton<FfmpegFactory>();
                     SetupDiscordBot(services, hostCtx);
                     services.AddSingleton<IDateTimeManager, DateTimeManager>();
 
-                    services.AddTransient<SearchServiceClient>();
-                    services.AddSingleton<PlayerServiceClient>();
-                    services.AddSingleton<SessionManager>();
+                    services.AddGrpcClient<SearchService.SearchService.SearchServiceClient>(
+                        static (services, options) =>
+                        {
+                            var settings = services.GetRequiredService<IOptions<SearchServiceClientSettings>>().Value;
+                            options.Address = new Uri(settings.ServiceUrl);
+                        }
+                    );
+
+                    services.AddGrpcClient<PlayersService.PlayersService.PlayersServiceClient>(
+                        static (services, options) =>
+                        {
+                            var settings = services.GetRequiredService<IOptions<PlayerServiceClientSettings>>().Value;
+                            options.Address = new Uri(settings.ServiceUrl);
+                        }
+                    );
                 }
             )
-            .UseSerilog(
-                (hostingContext, _, loggerConfiguration) =>
-                {
-                    Console.OutputEncoding = Encoding.UTF8;
-                    loggerConfiguration.ReadFrom.Configuration(hostingContext.Configuration);
-                }
-            )
+            .SetupSerilog()
             .ConfigureAppConfiguration(x => x.AddUserSecrets(Assembly.GetExecutingAssembly(), true));
 
         var host = hostBuilder.Build();

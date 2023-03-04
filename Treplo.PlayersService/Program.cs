@@ -1,4 +1,5 @@
 using Serilog;
+using Treplo.Common.OrleansGrpcConnector;
 using Treplo.Infrastructure.AspNet;
 using Treplo.PlayersService;
 
@@ -9,7 +10,9 @@ builder.Services
     .SetupSwaggerAndOpenApi()
     .AddGrpc().Services
     .AddSingleton<PlayersServiceImpl>()
-    .AddGrpcReflection();
+    .AddGrpcReflection()
+    .AddHttpClient()
+    .AddConverters();
 builder.Host.UseOrleans(
     x
         => x.UseLocalhostClustering()

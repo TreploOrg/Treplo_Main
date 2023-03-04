@@ -14,7 +14,8 @@ builder.Services
     .AddSearchEngineManager()
     .AddGrpc().Services
     .AddSingleton<SearchServiceImpl>()
-    .AddGrpcReflection();
+    .AddGrpcReflection()
+    .AddHttpClient();
 
 var app = builder.Build();
 
@@ -23,7 +24,7 @@ app.SetupSwaggerEndpoints()
 
 app.MapGrpcService<SearchServiceImpl>();
 
-if(app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment())
     app.MapGrpcReflectionService();
 
 await app.RunAsync();

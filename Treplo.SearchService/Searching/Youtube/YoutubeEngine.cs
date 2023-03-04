@@ -19,6 +19,7 @@ public class YoutubeEngine : ISearchEngine
 
     public string Name => "Youtube";
 
+    // TODO: handle video unavailable exception
     async IAsyncEnumerable<Track> ISearchEngine.FindInternalAsync(
         string query,
         [EnumeratorCancellation] CancellationToken cancellationToken

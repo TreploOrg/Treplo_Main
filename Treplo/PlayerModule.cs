@@ -1,25 +1,27 @@
 ﻿using Discord;
 using Discord.Interactions;
+using Grpc.Core;
 using Microsoft.Extensions.Logging;
-using Treplo.Clients;
-using Treplo.Common.Models;
+using Treplo.Common;
+using Treplo.SearchService;
+using static Treplo.SearchService.SearchService;
 
 namespace Treplo;
 
 public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
 {
     private readonly ILogger<PlayerModule> logger;
+    private readonly IClusterClient clusterClient;
     private readonly SearchServiceClient searchServiceClient;
-    private readonly SessionManager sessionManager;
 
     public PlayerModule(
+        IClusterClient clusterClient,
         SearchServiceClient searchServiceClient,
-        SessionManager sessionManager,
         ILogger<PlayerModule> logger
     )
     {
+        this.clusterClient = clusterClient;
         this.searchServiceClient = searchServiceClient;
-        this.sessionManager = sessionManager;
         this.logger = logger;
     }
 
@@ -38,7 +40,11 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
         Track? track = null;
         if (query is not null)
         {
-            var searchResult = await searchServiceClient.SearchAsync(query, 1).FirstOrDefaultAsync();
+            var searchResult = await searchServiceClient.Search(new TrackSearchRequest
+            {
+                Query = query,
+                Limit = 1,
+            }).ResponseStream.ReadAllAsync().FirstOrDefaultAsync();
 
             if (searchResult == default)
             {
@@ -49,8 +55,8 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
             track = searchResult.Track;
         }
         
-        var session = sessionManager.GetSession(Context.Guild.Id);
-        await session.Enqueue(track.GetValueOrDefault());
+        var session = clusterClient.GetGrain<ISessionGrain>(Context.Guild.Id.ToString());
+        await session.Enqueue(track!);
         await session.StartPlay(voiceChannel.Id);
         await FollowupAsync("Starting playback");
     }
@@ -66,14 +72,18 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
             return;
         }
 
-        var tracks = await searchServiceClient.SearchAsync(query, limit).ToArrayAsync();
+        var tracks = await searchServiceClient.Search(new ()
+        {
+            Query = query,
+            Limit = limit,
+        }).ResponseStream.ReadAllAsync().ToArrayAsync();
         if (tracks.Length == 0)
         {
             await FollowupAsync($"Couldn't find song {query}", ephemeral: true);
             return;
         }
         
-        var session = sessionManager.GetSession(Context.Guild.Id);
+        var session = clusterClient.GetGrain<ISessionGrain>(Context.Guild.Id.ToString());
 
         var tracksRequest = tracks.Select(x => x.Track);
 
