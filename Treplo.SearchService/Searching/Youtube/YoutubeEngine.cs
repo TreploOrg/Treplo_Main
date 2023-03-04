@@ -1,5 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
-using Treplo.Common.Models;
+using Google.Protobuf.WellKnownTypes;
+using Treplo.Common;
 using YoutubeExplorer;
 using YoutubeExplorer.Common;
 using YoutubeExplorer.Search;
@@ -39,7 +40,7 @@ public class YoutubeEngine : ISearchEngine
 
             foreach (var track in videos.Zip(manifests, CollectTrack).Where(track => track is not null))
             {
-                yield return track.GetValueOrDefault();
+                yield return track!;
             }
         }
     }
@@ -57,7 +58,7 @@ public class YoutubeEngine : ISearchEngine
             Title = video.Title,
             Thumbnail = video.Thumbnails.GetWithHighestResolution().Into(),
             Source = audioStreamInfo.Into(),
-            Duration = video.Duration.GetValueOrDefault(),
+            Duration = Duration.FromTimeSpan(video.Duration.GetValueOrDefault()),
         };
     }
 }

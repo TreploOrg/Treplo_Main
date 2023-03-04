@@ -4,30 +4,32 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
-using Serilog.Events;
 
 namespace Treplo.Infrastructure.AspNet;
 
 public static class StartupExtensions
 {
-    public static WebApplicationBuilder AddMediatr(this WebApplicationBuilder builder, params Assembly[] hints)
+    public static IServiceCollection AddMediatr(this IServiceCollection services, params Assembly[] hints)
     {
-        builder.Services.AddMediatR(hints.Append(Assembly.GetCallingAssembly()).ToArray());
-        return builder;
+        services.AddMediatR(hints.Append(Assembly.GetCallingAssembly()).ToArray());
+        return services;
     }
-    
-    public static WebApplicationBuilder SetupSwaggerAndOpenApi(this WebApplicationBuilder builder)
+
+    public static IServiceCollection SetupSwaggerAndOpenApi(this IServiceCollection services)
     {
-        builder.Services.AddEndpointsApiExplorer();
-        builder.Services.AddSwaggerGen();
-        
-        return builder;
+        services.AddEndpointsApiExplorer();
+        services.AddSwaggerGen();
+
+        return services;
     }
-    
-    public static WebApplicationBuilder SetupSerilog(this WebApplicationBuilder builder)
+
+    public static IHostBuilder SetupSerilog(this IHostBuilder builder)
     {
-        builder.Host.UseSerilog((ctx, config)
-            => config.ReadFrom.Configuration(ctx.Configuration)
+        Log.Logger = new LoggerConfiguration()
+            .CreateBootstrapLogger();
+        builder.UseSerilog(
+            (ctx, config)
+                => config.ReadFrom.Configuration(ctx.Configuration)
         );
 
         return builder;
@@ -49,5 +51,4 @@ public static class StartupExtensions
 
         return app;
     }
-    
 }

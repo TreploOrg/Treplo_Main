@@ -1,6 +1,4 @@
-﻿using Treplo.Common.Models;
-
-namespace Treplo.SearchService.Searching;
+﻿namespace Treplo.SearchService.Searching;
 
 public interface ISearchEngineManager
 {

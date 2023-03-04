@@ -1,6 +1,4 @@
 using System.Reflection;
-using MediatR;
-using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using Treplo.Infrastructure.AspNet;
 using Treplo.SearchService;
@@ -8,20 +6,24 @@ using Treplo.SearchService.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.SetupSerilog()
+builder.Host.SetupSerilog();
+builder.Services
     .SetupSwaggerAndOpenApi()
     .AddMediatr(Assembly.GetExecutingAssembly())
     .AddYoutubeEngine()
-    .AddSearchEngineManager();
+    .AddSearchEngineManager()
+    .AddGrpc().Services
+    .AddSingleton<SearchServiceImpl>()
+    .AddGrpcReflection();
 
 var app = builder.Build();
 
 app.SetupSwaggerEndpoints()
     .UseSerilogRequestLogging();
 
-app.MapGet("/search",
-    ([FromServices] IMediator mediatr, [AsParameters] SearchRequest request, CancellationToken cancellationToken) =>
-        mediatr.CreateStream(request, cancellationToken)
-);
+app.MapGrpcService<SearchServiceImpl>();
+
+if(app.Environment.IsDevelopment())
+    app.MapGrpcReflectionService();
 
 await app.RunAsync();
