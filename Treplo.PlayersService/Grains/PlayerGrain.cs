@@ -1,15 +1,12 @@
-﻿using Treplo.Common.Models;
-using Treplo.PlayersService.Interfaces;
+﻿using Treplo.Common;
 
 namespace Treplo.PlayersService.Grains;
 
 public sealed class PlayerGrain : Grain, IPlayerGrain
 {
     private readonly Queue<Track> queue = new();
-
-    //TODO: Search sessions probably need to be expirable
-    private readonly Dictionary<Guid, Track[]> searchSessions = new();
     private readonly ILogger<PlayerGrain> logger;
+    private LoopState loopState = LoopState.Off;
 
     public PlayerGrain(ILogger<PlayerGrain> logger)
     {
@@ -23,30 +20,42 @@ public sealed class PlayerGrain : Grain, IPlayerGrain
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask<Track[]> ShowQueue() => ValueTask.FromResult(queue.ToArray());
-
-    public ValueTask<Guid> StartSearch(Track[] searchTracks)
-    {
-        var guid = Guid.NewGuid();
-        logger.LogInformation("Started search with id {SearchId}, with {TrackCount} tracks", guid, searchTracks.Length);
-        searchSessions[guid] = searchTracks;
-        return ValueTask.FromResult(guid);
-    }
-
-    public async ValueTask<Track> RespondToSearch(Guid searchSessionId, uint searchResultIndex)
-    {
-        if (!searchSessions.Remove(searchSessionId, out var requests))
-            throw new ArgumentException("Unknown session id", nameof(searchSessionId));
-        logger.LogInformation("Responding to search {SearchId}", searchSessionId);
-        var track = requests[searchResultIndex];
-        await Enqueue(track);
-        return track;
-    }
+    public ValueTask<Track[]> GetQueue() => ValueTask.FromResult(queue.ToArray());
 
     public ValueTask<Track?> Dequeue()
     {
-        return queue.TryDequeue(out var result)
-            ? ValueTask.FromResult<Track?>(result)
-            : ValueTask.FromResult<Track?>(null);
+        if (!queue.TryDequeue(out var track)) 
+            return ValueTask.FromResult<Track?>(null);
+        if(loopState == LoopState.On)
+            queue.Enqueue(track);
+        return ValueTask.FromResult<Track?>(track);
+
     }
+
+    public ValueTask<LoopState> SwitchLoop()
+    {
+        loopState = loopState == LoopState.Off ? LoopState.On : LoopState.Off;
+
+        return ValueTask.FromResult(loopState);
+    }
+
+    public ValueTask<Track[]> Shuffle()
+    {
+        var array = queue.ToArray();
+        var n = array.Length;
+        for (var i = array.Length - 1; i > 1; i--)
+        {
+            var k = Random.Shared.Next(n + 1);  
+            (array[k], array[n]) = (array[n], array[k]);
+        }
+        
+        foreach (var track in array)
+        {
+            queue.Enqueue(track);
+        }
+        
+        return ValueTask.FromResult(array);
+    }
+
+    public ValueTask<LoopState> GetLoopState() => ValueTask.FromResult(loopState);
 }

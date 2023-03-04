@@ -8,6 +8,12 @@
 
     <ItemGroup>
         <PackageReference Include="CliWrap" Version="3.5.0" />
+        <PackageReference Include="Grpc.AspNetCore" Version="2.51.0" />
+        <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.51.0" />
+        <PackageReference Include="Grpc.Tools" Version="2.52.0">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
         <PackageReference Include="Microsoft.Orleans.Core" Version="7.0.0" />
         <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="7.0.0" />
         <PackageReference Include="Microsoft.Orleans.Server" Version="7.0.0" />
@@ -17,18 +23,12 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Treplo.Common\Treplo.Common.csproj" />
         <ProjectReference Include="..\Treplo.Infrastructure\Treplo.Infrastructure.csproj" />
-        <ProjectReference Include="..\Treplo.PlayersService.Interfaces\Treplo.PlayersService.Interfaces.csproj" />
-        <ProjectReference Include="..\Treplo.SearchService\Treplo.SearchService.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <ContentWithTargetPath Include="external\ffmpeg.exe">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-            <TargetPath>ffmpeg.exe</TargetPath>
-        </ContentWithTargetPath>
-        <None Include="external\ffmpeg.exe" />
+        <Protobuf Include="..\Treplo_Api\v1\proto\common.proto" GrpcServices="Server" />
+        <Protobuf Include="..\Treplo_Api\v1\proto\players_service.proto" GrpcServices="Server" />
     </ItemGroup>
 
 </Project>

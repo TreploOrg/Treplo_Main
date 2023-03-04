@@ -1,7 +1,7 @@
 using Treplo.PlayersService.Grains;
 using FakeItEasy;
 using Microsoft.Extensions.Logging;
-using Treplo.Common.Models;
+using Treplo.Common;
 using FluentAssertions;
 using AutoFixture;
 
@@ -24,7 +24,7 @@ public class Tests
     {
         var track = fixture.Create<Track>();
         await grain.Enqueue(track);
-        var actual = await grain.ShowQueue();
+        var actual = await grain.GetQueue();
         actual.Should().OnlyContain(x => x == track);
         actual.Should().HaveCount(1);
     }
@@ -36,7 +36,7 @@ public class Tests
         foreach (var track in tracks)
             await grain.Enqueue(track);
         
-        var actual = await grain.ShowQueue();
+        var actual = await grain.GetQueue();
         actual.Should().Equal(tracks);
     }
     
@@ -74,7 +74,7 @@ public class Tests
         var track = fixture.Create<Track>();
         await grain.Enqueue(track);
         await grain.Dequeue();
-        var actual = await grain.ShowQueue();
+        var actual = await grain.GetQueue();
         actual.Should().HaveCount(0);
     }
     
