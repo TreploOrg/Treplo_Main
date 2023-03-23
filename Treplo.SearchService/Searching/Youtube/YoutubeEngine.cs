@@ -38,22 +38,27 @@ public class YoutubeEngine : ISearchEngine
             var moveResult = await MoveNext(enumerator, query);
             if (moveResult is not { } result)
                 yield break;
-            
+
             if (result.IsError)
             {
                 yield return result.UnwrapError();
                 yield break;
             }
 
-            var videoResults = result.UnwrapOrDefault()!.OfType<VideoSearchResult>().ToArray();
-            var manifestTasks = videoResults.Select(
-                x => GetManifest(youtubeClient.Videos.Streams, x.Id, cancellationToken)
+            var manifestTasks = result.UnwrapOrDefault()!.OfType<VideoSearchResult>().Select(
+                async video =>
+                {
+                    var manifest = await GetManifest(youtubeClient.Videos.Streams, video.Id, cancellationToken);
+                    return (video, manifest);
+                }
             );
 
             var manifests = await Task.WhenAll(manifestTasks);
 
-            foreach (var (manifest, video) in manifests.Zip(videoResults))
+            foreach (var (video, manifestResult) in manifests)
             {
+                if (manifestResult is not { } manifest)
+                    continue;
                 yield return manifest.AndThen(
                     static (manifest, video) => CollectTrack(video, manifest).MapError(static error => (Error)error),
                     video
@@ -71,19 +76,19 @@ public class YoutubeEngine : ISearchEngine
         {
             if (await enumerator.MoveNextAsync())
                 return Result.Ok<IReadOnlyList<ISearchResult>, Error>(enumerator.Current.Items);
-            return null;
         }
         catch (OperationCanceledException)
         {
-            return Error.SearchCancelled(query);
         }
         catch (Exception e)
         {
             return Error.ErrorInSearch(query, e);
         }
+
+        return null;
     }
 
-    private static async Task<Result<StreamManifest, Error>> GetManifest(
+    private static async Task<Result<StreamManifest, Error>?> GetManifest(
         StreamClient client,
         VideoId id,
         CancellationToken cancellationToken
@@ -95,12 +100,13 @@ public class YoutubeEngine : ISearchEngine
         }
         catch (OperationCanceledException)
         {
-            return Error.ManifestCanceled(id);
         }
         catch (Exception e)
         {
             return Error.ErrorInManifest(id, e);
         }
+
+        return null;
     }
 
     private static Result<Track, NoAudioStreamError> CollectTrack(VideoSearchResult video, StreamManifest manifest)

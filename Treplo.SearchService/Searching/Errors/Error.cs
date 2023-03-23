@@ -7,23 +7,9 @@ public abstract class Error
 {
     public static SearchError ErrorInSearch(string query, Exception exception) => new(query, exception);
 
-    public static ManifestRequestCancelledError ManifestCanceled(VideoId videoId) => new(videoId);
-
     public static ManifestRequestError ErrorInManifest(VideoId videoId, Exception exception) => new(videoId, exception);
 
     public static NoAudioStreamError NoAudioStream(VideoSearchResult video) => new(video);
-
-    public static SearchCancelledError SearchCancelled(string query) => new(query);
-}
-
-public sealed class SearchCancelledError : Error
-{
-    public string Query { get; }
-
-    public SearchCancelledError(string query)
-    {
-        Query = query;
-    }
 }
 
 public sealed class NoAudioStreamError : Error
@@ -45,16 +31,6 @@ public sealed class ManifestRequestError : Error
     {
         VideoId = videoId;
         Exception = exception;
-    }
-}
-
-public sealed class ManifestRequestCancelledError : Error
-{
-    public VideoId VideoId { get; }
-
-    public ManifestRequestCancelledError(VideoId videoId)
-    {
-        VideoId = videoId;
     }
 }
 

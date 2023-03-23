@@ -40,12 +40,6 @@ public sealed class SearchServiceImpl : SearchService.SearchServiceBase
     {
         switch (error)
         {
-            case ManifestRequestCancelledError manifestRequestCancelledError:
-                logger.LogInformation(
-                    "Manifest request cancelled for video {VideoId}",
-                    manifestRequestCancelledError.VideoId
-                );
-                break;
             case ManifestRequestError manifestRequestError:
                 logger.LogWarning(
                     manifestRequestError.Exception,
@@ -59,9 +53,6 @@ public sealed class SearchServiceImpl : SearchService.SearchServiceBase
                     noAudioStreamError.Video.Title,
                     noAudioStreamError.Video.Id
                 );
-                break;
-            case SearchCancelledError searchCancelledError:
-                logger.LogInformation("Search cancelled for query {Query}", searchCancelledError.Query);
                 break;
             case SearchError searchError:
                 logger.LogWarning(
