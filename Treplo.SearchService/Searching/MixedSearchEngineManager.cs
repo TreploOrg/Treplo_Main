@@ -1,4 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
+using SimpleResult;
+using Treplo.SearchService.Searching.Errors;
 
 namespace Treplo.SearchService.Searching;
 
@@ -11,18 +13,13 @@ public class MixedSearchEngineManager : ISearchEngineManager
         this.engines = engines.ToArray();
     }
 
-    public async IAsyncEnumerable<TrackSearchResult> SearchAsync(
+    public async IAsyncEnumerable<Result<TrackSearchResult, Error>> SearchAsync(
         string searchQuery,
         [EnumeratorCancellation] CancellationToken cancellationToken = default
     )
     {
-        if (cancellationToken.IsCancellationRequested)
-            yield break;
-
         foreach (var searchEngine in engines)
         {
-            if (cancellationToken.IsCancellationRequested)
-                yield break;
             await foreach (var result in searchEngine.FindAsync(searchQuery, cancellationToken))
             {
                 yield return result;

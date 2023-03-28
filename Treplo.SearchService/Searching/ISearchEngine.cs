@@ -1,5 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
+using SimpleResult;
 using Treplo.Common;
+using Treplo.SearchService.Searching.Errors;
 
 namespace Treplo.SearchService.Searching;
 
@@ -7,20 +9,26 @@ public interface ISearchEngine
 {
     string Name { get; }
 
-    async IAsyncEnumerable<TrackSearchResult> FindAsync(
+    async IAsyncEnumerable<Result<TrackSearchResult, Error>> FindAsync(
         string query,
         [EnumeratorCancellation] CancellationToken cancellationToken = default
     )
     {
         await foreach (var track in FindInternalAsync(query, cancellationToken))
         {
-            yield return new TrackSearchResult
-            {
-                Track = track,
-                SearchEngineName = Name,
-            };
+            yield return track.Map(
+                static (track, name) => new TrackSearchResult
+                {
+                    Track = track,
+                    SearchEngineName = name,
+                },
+                Name
+            );
         }
     }
 
-    protected IAsyncEnumerable<Track> FindInternalAsync(string query, CancellationToken cancellationToken = default);
+    protected IAsyncEnumerable<Result<Track, Error>> FindInternalAsync(
+        string query,
+        CancellationToken cancellationToken = default
+    );
 }

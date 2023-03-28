@@ -1,6 +1,9 @@
-﻿namespace Treplo.SearchService.Searching;
+﻿using SimpleResult;
+using Treplo.SearchService.Searching.Errors;
+
+namespace Treplo.SearchService.Searching;
 
 public interface ISearchEngineManager
 {
-    IAsyncEnumerable<TrackSearchResult> SearchAsync(string searchQuery, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<Result<TrackSearchResult, Error>> SearchAsync(string searchQuery, CancellationToken cancellationToken = default);
 }
