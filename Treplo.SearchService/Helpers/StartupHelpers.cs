@@ -8,9 +8,9 @@ namespace Treplo.SearchService.Helpers;
 
 public static class StartupHelpers
 {
-    public static WebApplicationBuilder AddYoutubeEngine(this WebApplicationBuilder builder)
+    public static IServiceCollection AddYoutubeEngine(this IServiceCollection services)
     {
-        builder.Services.AddHttpClient<YoutubeEngine>().ConfigureHttpMessageHandlerBuilder(x =>
+        services.AddHttpClient<YoutubeEngine>().ConfigureHttpMessageHandlerBuilder(x =>
         {
             var handler = new HttpClientHandler
             {
@@ -23,13 +23,13 @@ public static class StartupHelpers
             x.PrimaryHandler = handler;
         });
 
-        builder.Services.AddSingleton<ISearchEngine, YoutubeEngine>();
-        return builder;
+        services.AddSingleton<ISearchEngine, YoutubeEngine>();
+        return services;
     }
 
-    public static WebApplicationBuilder AddSearchEngineManager(this WebApplicationBuilder builder)
+    public static IServiceCollection AddSearchEngineManager(this IServiceCollection services)
     {
-        builder.Services.AddSingleton<ISearchEngineManager, MixedSearchEngineManager>();
-        return builder;
+        services.AddSingleton<ISearchEngineManager, MixedSearchEngineManager>();
+        return services;
     }
 }

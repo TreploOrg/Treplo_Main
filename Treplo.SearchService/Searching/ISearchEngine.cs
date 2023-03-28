@@ -1,5 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
-using Treplo.Common.Models;
+using Treplo.Common;
 
 namespace Treplo.SearchService.Searching;
 
@@ -14,7 +14,11 @@ public interface ISearchEngine
     {
         await foreach (var track in FindInternalAsync(query, cancellationToken))
         {
-            yield return new TrackSearchResult(track, Name);
+            yield return new TrackSearchResult
+            {
+                Track = track,
+                SearchEngineName = Name,
+            };
         }
     }
 

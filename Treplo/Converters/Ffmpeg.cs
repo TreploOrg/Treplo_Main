@@ -1,9 +1,9 @@
 ﻿using System.IO.Pipelines;
 using System.Text;
 using CliWrap;
-using Treplo.Common.Models;
+using Treplo.Common;
 
-namespace Treplo.PlayersService.Converters;
+namespace Treplo.Converters;
 
 public sealed class Ffmpeg
 {
@@ -12,12 +12,12 @@ public sealed class Ffmpeg
     private readonly StringBuilder errorBuilder;
     private readonly Command command;
 
-    public Ffmpeg(string path, in StreamInfo inStreamInfo, in StreamFormatRequest requiredFormat)
+    public Ffmpeg(string path, AudioSource audioSource, in StreamFormatRequest requiredFormat)
     {
         errorBuilder = new StringBuilder();
         command = Cli.Wrap(path)
             .WithValidation(CommandResultValidation.None)
-            .WithArguments(GetArguments(in inStreamInfo, in requiredFormat))
+            .WithArguments(GetArguments(audioSource, in requiredFormat))
             .WithStandardInputPipe(PipeSource.Create((destination, cancellationToken)
                 => inputPipe.Reader.CopyToAsync(destination, cancellationToken)))
             .WithStandardErrorPipe(PipeTarget.ToStringBuilder(errorBuilder))
@@ -46,12 +46,12 @@ public sealed class Ffmpeg
         }
     }
 
-    private static string GetArguments(in StreamInfo inStreamInfo, in StreamFormatRequest requiredFormat)
+    private static string GetArguments(AudioSource audioSource, in StreamFormatRequest requiredFormat)
     {
         var argumentString = new StringBuilder("-hide_banner -loglevel error ");
 
-        var container = inStreamInfo.Container;
-        var codec = container.Name == "mp4" ? "aac" : inStreamInfo.Codec.Name;
+        var container = audioSource.Container;
+        var codec = container.Name == "mp4" ? "aac" : audioSource.Codec.Name;
         argumentString.Append($"-f {container.Name} -codec {codec} ");
 
 

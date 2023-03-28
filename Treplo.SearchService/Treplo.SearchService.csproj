@@ -7,15 +7,19 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Serilog" Version="2.12.0"/>
-        <PackageReference Include="Serilog.AspNetCore" Version="6.1.0"/>
-        <PackageReference Include="Serilog.Enrichers.Environment" Version="2.2.0"/>
-        <PackageReference Include="Serilog.Enrichers.Thread" Version="3.1.0"/>
-        <PackageReference Include="Serilog.Extensions.Logging" Version="3.1.0"/>
-        <PackageReference Include="Serilog.Settings.Configuration" Version="3.4.0"/>
-        <PackageReference Include="Serilog.Sinks.Console" Version="4.1.0"/>
-        <PackageReference Include="MediatR" Version="11.1.0"/>
-        <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="11.0.0"/>
+        <PackageReference Include="Grpc.AspNetCore" Version="2.51.0" />
+        <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.51.0" />
+        <PackageReference Include="Grpc.Tools" Version="2.52.0">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Serilog" Version="2.12.0" />
+        <PackageReference Include="Serilog.AspNetCore" Version="6.1.0" />
+        <PackageReference Include="Serilog.Enrichers.Environment" Version="2.2.0" />
+        <PackageReference Include="Serilog.Enrichers.Thread" Version="3.1.0" />
+        <PackageReference Include="Serilog.Extensions.Logging" Version="3.1.0" />
+        <PackageReference Include="Serilog.Settings.Configuration" Version="3.4.0" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="4.1.0" />
     </ItemGroup>
 
     <ItemGroup>
@@ -23,7 +27,7 @@
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <TargetPath>YoutubeExplorer.dll</TargetPath>
         </ContentWithTargetPath>
-        <None Include="external\YoutubeExplorer.dll"/>
+        <None Include="external\YoutubeExplorer.dll" />
     </ItemGroup>
 
     <ItemGroup>
@@ -33,8 +37,12 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Treplo.Common\Treplo.Common.csproj"/>
-        <ProjectReference Include="..\Treplo.Infrastructure\Treplo.Infrastructure.csproj"/>
+        <ProjectReference Include="..\Treplo.Infrastructure\Treplo.Infrastructure.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Protobuf Include="..\Treplo_Api\v1\proto\common.proto" GrpcServices="Server" />
+        <Protobuf Include="..\Treplo_Api\v1\proto\search_service.proto" GrpcServices="Server" />
     </ItemGroup>
 
 </Project>

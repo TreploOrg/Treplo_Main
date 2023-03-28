@@ -1,5 +1,4 @@
 ﻿using System.Runtime.CompilerServices;
-using Treplo.Common.Models;
 
 namespace Treplo.SearchService.Searching;
 

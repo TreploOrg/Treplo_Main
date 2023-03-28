@@ -1,0 +1,3 @@
+[submodule "Treplo_Api"]
+	path = Treplo_Api
+	url = https://github.com/TreploOrg/Treplo_Api.git

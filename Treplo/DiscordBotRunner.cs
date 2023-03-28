@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Events;
-using Treplo.Clients;
 
 namespace Treplo;
 
@@ -14,7 +13,7 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
 {
     private readonly DiscordSocketClient client;
     private readonly IDateTimeManager dateTimeManager;
-    private readonly SessionManager sessionManager;
+    private readonly IClusterClient clusterClient;
     private readonly InteractionService interactionService;
     private readonly ILogger<DiscordBotRunner> logger;
     private readonly IServiceProvider serviceProvider;
@@ -25,7 +24,7 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
         InteractionService interactionService,
         IServiceProvider serviceProvider,
         IDateTimeManager dateTimeManager,
-        SessionManager sessionManager,
+        IClusterClient clusterClient,
         IOptions<DiscordClientSettings> settings,
         ILogger<DiscordBotRunner> logger
     )
@@ -34,7 +33,7 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
         this.interactionService = interactionService;
         this.serviceProvider = serviceProvider;
         this.dateTimeManager = dateTimeManager;
-        this.sessionManager = sessionManager;
+        this.clusterClient = clusterClient;
         this.settings = settings;
         this.logger = logger;
 
@@ -101,7 +100,7 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
             {
                 try
                 {
-                    var session = sessionManager.GetSession(component.GuildId.GetValueOrDefault());
+                    var session = clusterClient.GetGrain<ISessionGrain>(component.GuildId.GetValueOrDefault().ToString());
                     var track = await session.EndSearch(searchId, index);
                     var trackTitle = track.Title;
                 
