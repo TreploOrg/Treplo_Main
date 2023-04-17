@@ -11,13 +11,14 @@ public static class AsyncEnumerableExtensions
     )
     {
         var count = 0u;
+        if(limit == 0)
+            yield break;
         await foreach (var item in source.WithCancellation(cancellationToken))
         {
-            if (count >= limit || cancellationToken.IsCancellationRequested)
-                yield break;
-
             yield return item;
             count++;
+            if (count >= limit || cancellationToken.IsCancellationRequested)
+                yield break;
         }
     }
 }

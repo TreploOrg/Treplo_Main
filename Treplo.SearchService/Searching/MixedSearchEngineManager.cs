@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Threading.Channels;
 using SimpleResult;
 using Treplo.SearchService.Searching.Errors;
 
@@ -13,19 +13,156 @@ public class MixedSearchEngineManager : ISearchEngineManager
         this.engines = engines.ToArray();
     }
 
-    public async IAsyncEnumerable<Result<TrackSearchResult, Error>> SearchAsync(
+    public IAsyncEnumerable<Result<TrackSearchResult, Error>> SearchAsync(
         string searchQuery,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default
+        CancellationToken cancellationToken = default
     )
     {
-        foreach (var searchEngine in engines)
+        return new Enumerable(searchQuery, engines, cancellationToken);
+    }
+
+    private class Enumerable : IAsyncEnumerable<Result<TrackSearchResult, Error>>
+    {
+        private readonly string query;
+        private readonly ICollection<ISearchEngine> engines;
+        private readonly CancellationToken searchToken;
+
+        public Enumerable(string query, ICollection<ISearchEngine> engines, CancellationToken searchToken)
         {
-            await foreach (var result in searchEngine.FindAsync(searchQuery, cancellationToken))
+            this.query = query;
+            this.engines = engines;
+            this.searchToken = searchToken;
+        }
+
+        public IAsyncEnumerator<Result<TrackSearchResult, Error>> GetAsyncEnumerator(
+            CancellationToken cancellationToken
+        )
+        {
+            var channel = Channel.CreateBounded<Result<TrackSearchResult, Error>>(
+                new BoundedChannelOptions(engines.Count)
+                {
+                    FullMode = BoundedChannelFullMode.Wait,
+                    SingleWriter = false,
+                    SingleReader = true,
+                }
+            );
+
+            var cs = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, searchToken);
+            var searchTask = StartSearch(channel.Writer, cs.Token);
+            return new Enumerator(query, channel.Reader, cs, searchTask);
+        }
+
+        private async Task StartSearch(
+            ChannelWriter<Result<TrackSearchResult, Error>> output,
+            CancellationToken cancellationToken
+        )
+        {
+            Exception? localException = null;
+            try
             {
-                yield return result;
-                if (cancellationToken.IsCancellationRequested)
-                    yield break;
+                await Task.WhenAll(
+                    engines.Select(engine => StartEngineSearch(engine, query, output, cancellationToken))
+                );
             }
+            catch (Exception e)
+            {
+                localException = e;
+            }
+            finally
+            {
+                // one of the engines threw, should not happen but we'll propagate to the channel just in case
+                output.Complete(localException);
+            }
+        }
+
+        private static async Task StartEngineSearch(
+            ISearchEngine engine,
+            string query,
+            ChannelWriter<Result<TrackSearchResult, Error>> outputSink,
+            CancellationToken cancellationToken
+        )
+        {
+            await foreach (var result in engine.FindAsync(query, cancellationToken))
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+                try
+                {
+                    await outputSink.WriteAsync(result, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    private class Enumerator : IAsyncEnumerator<Result<TrackSearchResult, Error>>
+    {
+        private readonly string query;
+        private readonly ChannelReader<Result<TrackSearchResult, Error>> tracksReader;
+        private readonly CancellationTokenSource cancellationTokenSource;
+        private readonly Task searchTask;
+
+        private bool readAvailable;
+        private bool threw;
+        private Result<TrackSearchResult, Error> current;
+
+        public Result<TrackSearchResult, Error> Current => current;
+
+        public Enumerator(
+            string query,
+            ChannelReader<Result<TrackSearchResult, Error>> tracksReader,
+            CancellationTokenSource cancellationTokenSource,
+            Task searchTask
+        )
+        {
+            this.query = query;
+            this.tracksReader = tracksReader;
+            this.cancellationTokenSource = cancellationTokenSource;
+            this.searchTask = searchTask;
+        }
+
+        public async ValueTask<bool> MoveNextAsync()
+        {
+            while (true)
+            {
+                if (cancellationTokenSource.IsCancellationRequested)
+                    return false;
+                if (!readAvailable && !threw)
+                {
+                    try
+                    {
+                        readAvailable = await tracksReader.WaitToReadAsync(cancellationTokenSource.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        readAvailable = false;
+                    }
+                    catch (Exception e)
+                    {
+                        current = Error.ErrorInSearch(query, e);
+                        threw = true;
+                        return true;
+                    }
+                }
+
+                if (!readAvailable || threw) return false;
+
+                readAvailable = tracksReader.TryRead(out current);
+                if (readAvailable)
+                    break;
+            }
+
+            return true;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            cancellationTokenSource.Cancel();
+            await searchTask;
+            cancellationTokenSource.Dispose();
         }
     }
 }
