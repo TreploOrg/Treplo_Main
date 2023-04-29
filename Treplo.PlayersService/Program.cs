@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Serilog;
 using Treplo.Common.OrleansGrpcConnector;
 using Treplo.Infrastructure.AspNet;
@@ -5,6 +6,7 @@ using Treplo.PlayersService;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.ConfigureKestrel(o => o.ConfigureEndpointDefaults(lo => lo.Protocols = HttpProtocols.Http2));
 builder.Host.SetupSerilog();
 builder.Services
     .SetupSwaggerAndOpenApi()
