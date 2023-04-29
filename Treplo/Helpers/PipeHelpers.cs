@@ -17,7 +17,6 @@ public static class PipeHelpers
         }
         catch (OperationCanceledException)
         {
-            
         }
         catch (Exception e)
         {

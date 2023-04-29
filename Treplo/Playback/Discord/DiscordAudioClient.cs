@@ -103,7 +103,7 @@ public sealed class DiscordAudioClient : IAudioClient
     private void DisconnectAudio()
     {
         var local = Interlocked.Exchange(ref currentAudioConnection, null);
-        
+
         local?.Dispose();
     }
 

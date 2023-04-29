@@ -26,14 +26,14 @@ public sealed class RawAudioSource : IRawAudioSource
         );
         return new AudioStreamReaderPipe(result.ResponseStream.ReadAllAsync(cts.Token), result, cts);
     }
-    
+
     private sealed class AudioStreamReaderPipe : PipeReader
     {
         private readonly IAsyncEnumerable<AudioFrame> audioFramesStream;
         private readonly IDisposable callHandle;
         private readonly Pipe innerPipe;
         private CancellationTokenSource? cts;
-    
+
         public AudioStreamReaderPipe(
             IAsyncEnumerable<AudioFrame> audioFramesStream,
             IDisposable callHandle,
@@ -46,7 +46,7 @@ public sealed class RawAudioSource : IRawAudioSource
             innerPipe = new Pipe();
             _ = AudioPipeCore(cts.Token);
         }
-    
+
         private async Task AudioPipeCore(CancellationToken cancellationToken)
         {
             Exception? localException = null;
@@ -60,7 +60,6 @@ public sealed class RawAudioSource : IRawAudioSource
             }
             catch (OperationCanceledException)
             {
-                
             }
             catch (Exception e)
             {
@@ -75,23 +74,24 @@ public sealed class RawAudioSource : IRawAudioSource
         }
 
         public override void AdvanceTo(SequencePosition consumed) => innerPipe.Reader.AdvanceTo(consumed);
-    
-        public override void AdvanceTo(SequencePosition consumed, SequencePosition examined) => innerPipe.Reader.AdvanceTo(consumed, examined);
-    
+
+        public override void AdvanceTo(SequencePosition consumed, SequencePosition examined)
+            => innerPipe.Reader.AdvanceTo(consumed, examined);
+
         public override void CancelPendingRead() => innerPipe.Reader.CancelPendingRead();
-    
+
         public override void Complete(Exception? exception = null)
         {
             innerPipe.Reader.Complete(exception);
             FireCts();
             callHandle.Dispose();
         }
-    
+
         public override ValueTask<ReadResult> ReadAsync(CancellationToken cancellationToken = default)
             => innerPipe.Reader.ReadAsync(cancellationToken);
-    
+
         public override bool TryRead(out ReadResult result) => innerPipe.Reader.TryRead(out result);
-        
+
         private void FireCts()
         {
             var local = Interlocked.Exchange(ref cts, null);

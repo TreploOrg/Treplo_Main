@@ -7,10 +7,10 @@ namespace Treplo.Converters.Ffmpeg;
 
 public sealed class FfmpegConverter : IAudioConverter
 {
+    private readonly Command command;
+    private readonly StringBuilder errorBuilder;
     private readonly Pipe inputPipe = new();
     private readonly Pipe outputPipe = new();
-    private readonly StringBuilder errorBuilder;
-    private readonly Command command;
 
     public FfmpegConverter(string path, AudioSource audioSource, in StreamFormatRequest requiredFormat)
     {
@@ -18,11 +18,19 @@ public sealed class FfmpegConverter : IAudioConverter
         command = Cli.Wrap(path)
             .WithValidation(CommandResultValidation.None)
             .WithArguments(GetArguments(audioSource, in requiredFormat))
-            .WithStandardInputPipe(PipeSource.Create((destination, cancellationToken)
-                => inputPipe.Reader.CopyToAsync(destination, cancellationToken)))
+            .WithStandardInputPipe(
+                PipeSource.Create(
+                    (destination, cancellationToken)
+                        => inputPipe.Reader.CopyToAsync(destination, cancellationToken)
+                )
+            )
             .WithStandardErrorPipe(PipeTarget.ToStringBuilder(errorBuilder))
-            .WithStandardOutputPipe(PipeTarget.Create((source, cancellationToken)
-                => source.CopyToAsync(outputPipe.Writer, cancellationToken)));
+            .WithStandardOutputPipe(
+                PipeTarget.Create(
+                    (source, cancellationToken)
+                        => source.CopyToAsync(outputPipe.Writer, cancellationToken)
+                )
+            );
     }
 
     public async Task Start(CancellationToken cancellationToken)
@@ -45,6 +53,9 @@ public sealed class FfmpegConverter : IAudioConverter
             await outputPipe.Writer.CompleteAsync(localException);
         }
     }
+
+    public PipeReader Output => outputPipe.Reader;
+    public PipeWriter Input => inputPipe.Writer;
 
     private static string GetArguments(AudioSource audioSource, in StreamFormatRequest requiredFormat)
     {
@@ -73,9 +84,6 @@ public sealed class FfmpegConverter : IAudioConverter
                 stringBuilder.Append($"-ar {frequency} ");
         }
     }
-
-    public PipeReader Output => outputPipe.Reader;
-    public PipeWriter Input => inputPipe.Writer;
 }
 
 public class FfmpegPipingException : Exception

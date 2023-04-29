@@ -4,16 +4,14 @@ using Discord.WebSocket;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Serilog;
-using Serilog.Events;
 
 namespace Treplo;
 
 public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDisposable
 {
     private readonly DiscordSocketClient client;
-    private readonly IDateTimeManager dateTimeManager;
     private readonly IClusterClient clusterClient;
+    private readonly IDateTimeManager dateTimeManager;
     private readonly InteractionService interactionService;
     private readonly ILogger<DiscordBotRunner> logger;
     private readonly IServiceProvider serviceProvider;
@@ -96,33 +94,38 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
             && component.GuildId is not null
             && uint.TryParse(data.Values.FirstOrDefault(), out var index)
         )
-            await Task.Factory.StartNew(async () =>
-            {
-                try
+            await Task.Factory.StartNew(
+                async () =>
                 {
-                    var session = clusterClient.GetGrain<ISessionGrain>(component.GuildId.GetValueOrDefault().ToString());
-                    var track = await session.EndSearch(searchId, index);
-                    var trackTitle = track.Title;
-                
-                    await component.UpdateAsync(x => x.Content = $"Selected track {trackTitle}");
+                    try
+                    {
+                        var session =
+                            clusterClient.GetGrain<ISessionGrain>(component.GuildId.GetValueOrDefault().ToString());
+                        var track = await session.EndSearch(searchId, index);
+                        var trackTitle = track.Title;
 
-                    var guildUser = component.User as IGuildUser;
-                    await session.StartPlay(guildUser.VoiceChannel.Id);
+                        await component.UpdateAsync(x => x.Content = $"Selected track {trackTitle}");
+
+                        var guildUser = component.User as IGuildUser;
+                        await session.StartPlay(guildUser.VoiceChannel.Id);
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogError(e, "Error during search responding");
+                        throw;
+                    }
                 }
-                catch (Exception e)
-                {
-                    logger.LogError(e, "Error during search responding");
-                    throw;
-                }
-            });
+            );
         else
             await component.UpdateAsync(x => { x.Content = "Something went wrong"; });
     }
 
     private async Task ClientOnReady()
     {
-        await Task.WhenAll(client.Guilds.AsParallel()
-            .Select(async x => await (Task)interactionService.RegisterCommandsToGuildAsync(x.Id)));
+        await Task.WhenAll(
+            client.Guilds.AsParallel()
+                .Select(async x => await (Task)interactionService.RegisterCommandsToGuildAsync(x.Id))
+        );
     }
 
     private async Task InteractionServiceOnSlashCommandExecuted(
@@ -144,18 +147,27 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
 
         if (command is not null)
         {
-            logger.LogError("Error occured during command \"{Command}\" handling: {ErrorType} - {ErrorMessage}",
-                command.Name, result.Error, result.ErrorReason);
+            logger.LogError(
+                "Error occured during command \"{Command}\" handling: {ErrorType} - {ErrorMessage}",
+                command.Name,
+                result.Error,
+                result.ErrorReason
+            );
             embedBuilder.WithDescription(
-                $"Error occured during command \"{command.Name}\" handling: {result.Error!} - {result.ErrorReason}");
+                $"Error occured during command \"{command.Name}\" handling: {result.Error!} - {result.ErrorReason}"
+            );
             await context.Interaction.ModifyOriginalResponseAsync(x => x.Embed = embedBuilder.Build());
         }
         else
         {
-            logger.LogError("Error occured during command handling: {ErrorType} - {ErrorMessage}",
-                result.Error, result.ErrorReason);
+            logger.LogError(
+                "Error occured during command handling: {ErrorType} - {ErrorMessage}",
+                result.Error,
+                result.ErrorReason
+            );
             embedBuilder.WithDescription(
-                $"Error occured during command handling: {result.Error!} - {result.ErrorReason}");
+                $"Error occured during command handling: {result.Error!} - {result.ErrorReason}"
+            );
             await context.Interaction.RespondAsync(embed: embedBuilder.Build(), ephemeral: true);
         }
     }
@@ -173,12 +185,14 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
 
     private Task SourcedLog(LogMessage logMessage, string source)
     {
-        logger.Log(GetSerilogLevel(logMessage.Severity),
+        logger.Log(
+            GetSerilogLevel(logMessage.Severity),
             logMessage.Exception,
             "[{ExternalSource} - {InternalSource}] {Message}",
             source,
             logMessage.Source,
-            logMessage.Message ?? string.Empty);
+            logMessage.Message ?? string.Empty
+        );
         return Task.CompletedTask;
     }
 }

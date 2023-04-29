@@ -16,4 +16,3 @@ public sealed class PlayerServiceClientSettings : GrpcServiceSettings, ISetting
 {
     public static string SectionName => nameof(PlayerServiceClientSettings);
 }
-

@@ -5,7 +5,6 @@ using Treplo.Helpers;
 using Treplo.Playback;
 using Treplo.PlayersService;
 using static Treplo.PlayersService.PlayersService;
-using IAudioClient = Treplo.Playback.IAudioClient;
 
 namespace Treplo;
 
@@ -15,18 +14,19 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
     {
         Channels = 2,
         Frequency = 48000,
-        Container = new()
+        Container = new Container
         {
             Name = "s16le",
         },
     };
 
+    private readonly Dictionary<Guid, Track[]> activeSearches = new();
+    private readonly IAudioClient audioClient;
+    private readonly IAudioConverterFactory converterFactory;
+    private readonly ILogger<SessionGrain> logger;
+
     private readonly PlayersServiceClient playerServiceClient;
     private readonly IRawAudioSource rawAudioSource;
-    private readonly IAudioConverterFactory converterFactory;
-    private readonly IAudioClient audioClient;
-    private readonly ILogger<SessionGrain> logger;
-    private readonly Dictionary<Guid, Track[]> activeSearches = new();
 
     private CancellationTokenSource playbackCancellation = new();
     private Task? playbackTask;
@@ -44,6 +44,13 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
         this.converterFactory = converterFactory;
         this.audioClient = audioClient;
         this.logger = logger;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await WaitPlaybackStop();
+        await audioClient.DisposeAsync();
+        playbackCancellation.Dispose();
     }
 
 
@@ -72,6 +79,37 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
 
         await audioClient.ConnectToChannel(voiceChannelId);
         playbackTask = StartPlaybackCore(playbackCancellation.Token);
+    }
+
+    public ValueTask<Guid> StartSearch(Track[] searchTracks)
+    {
+        var searchId = Guid.NewGuid();
+        activeSearches[searchId] = searchTracks;
+        return ValueTask.FromResult(searchId);
+    }
+
+    public async ValueTask<Track> EndSearch(Guid searchSessionId, uint trackId)
+    {
+        if (!activeSearches.Remove(searchSessionId, out var requests))
+            throw new ArgumentException("Unknown session id", nameof(searchSessionId));
+        logger.LogInformation("Responding to search {SearchId}", searchSessionId);
+        var track = requests[trackId];
+        await Enqueue(track);
+        return track;
+    }
+
+    public async ValueTask Enqueue(Track track)
+    {
+        await playerServiceClient.EnqueueAsync(
+            new EnqueueRequest
+            {
+                PlayerRequest = new PlayerIdentifier
+                {
+                    PlayerId = this.GetPrimaryKeyString(),
+                },
+                Track = track,
+            }
+        );
     }
 
 
@@ -117,48 +155,10 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
         playbackTask = null;
     }
 
-    public ValueTask<Guid> StartSearch(Track[] searchTracks)
-    {
-        var searchId = Guid.NewGuid();
-        activeSearches[searchId] = searchTracks;
-        return ValueTask.FromResult(searchId);
-    }
-
-    public async ValueTask<Track> EndSearch(Guid searchSessionId, uint trackId)
-    {
-        if (!activeSearches.Remove(searchSessionId, out var requests))
-            throw new ArgumentException("Unknown session id", nameof(searchSessionId));
-        logger.LogInformation("Responding to search {SearchId}", searchSessionId);
-        var track = requests[trackId];
-        await Enqueue(track);
-        return track;
-    }
-
-    public async ValueTask Enqueue(Track track)
-    {
-        await playerServiceClient.EnqueueAsync(
-            new()
-            {
-                PlayerRequest = new()
-                {
-                    PlayerId = this.GetPrimaryKeyString(),
-                },
-                Track = track,
-            }
-        );
-    }
-
     public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
         await DisposeAsync();
         await base.OnDeactivateAsync(reason, cancellationToken);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await WaitPlaybackStop();
-        await audioClient.DisposeAsync();
-        playbackCancellation.Dispose();
     }
 
     private async ValueTask WaitPlaybackStop()
