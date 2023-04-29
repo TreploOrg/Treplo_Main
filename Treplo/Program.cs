@@ -1,5 +1,4 @@
 ﻿using System.Reflection;
-using System.Text;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
@@ -7,10 +6,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using Serilog;
 using Treplo.Common.OrleansGrpcConnector;
+using Treplo.Converters;
+using Treplo.Converters.Ffmpeg;
 using Treplo.Infrastructure.AspNet;
 using Treplo.Infrastructure.Configuration;
+using Treplo.Playback;
+using Treplo.Playback.Discord;
 
 namespace Treplo;
 
@@ -31,7 +33,9 @@ internal static class Program
                 (hostCtx, services) =>
                 {
                     services.AddConverters()
-                        .AddSingleton<FfmpegFactory>();
+                        .AddSingleton<IAudioConverterFactory, FfmpegConverterFactory>();
+                    services.AddScoped<IAudioClient, DiscordAudioClient>();
+                    services.AddSingleton<IRawAudioSource, RawAudioSource>();
                     SetupDiscordBot(services, hostCtx);
                     services.AddSingleton<IDateTimeManager, DateTimeManager>();
 
@@ -80,6 +84,7 @@ internal static class Program
                 return client;
             }
         );
+        services.AddSingleton<IDiscordClient>(ctx => ctx.GetRequiredService<DiscordSocketClient>());
         services.AddSingleton(
             ctx =>
             {

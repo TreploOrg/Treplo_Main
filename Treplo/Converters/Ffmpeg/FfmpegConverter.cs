@@ -3,16 +3,16 @@ using System.Text;
 using CliWrap;
 using Treplo.Common;
 
-namespace Treplo.Converters;
+namespace Treplo.Converters.Ffmpeg;
 
-public sealed class Ffmpeg
+public sealed class FfmpegConverter : IAudioConverter
 {
     private readonly Pipe inputPipe = new();
     private readonly Pipe outputPipe = new();
     private readonly StringBuilder errorBuilder;
     private readonly Command command;
 
-    public Ffmpeg(string path, AudioSource audioSource, in StreamFormatRequest requiredFormat)
+    public FfmpegConverter(string path, AudioSource audioSource, in StreamFormatRequest requiredFormat)
     {
         errorBuilder = new StringBuilder();
         command = Cli.Wrap(path)
@@ -25,7 +25,7 @@ public sealed class Ffmpeg
                 => source.CopyToAsync(outputPipe.Writer, cancellationToken)));
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken = default)
+    public async Task Start(CancellationToken cancellationToken)
     {
         Exception? localException = null;
         try

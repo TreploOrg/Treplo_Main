@@ -1,13 +1,11 @@
-﻿using System.IO.Pipelines;
-using Discord;
-using Discord.Audio;
-using Discord.WebSocket;
-using Grpc.Core;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Treplo.Common;
 using Treplo.Converters;
+using Treplo.Helpers;
+using Treplo.Playback;
 using Treplo.PlayersService;
 using static Treplo.PlayersService.PlayersService;
+using IAudioClient = Treplo.Playback.IAudioClient;
 
 namespace Treplo;
 
@@ -23,137 +21,100 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
         },
     };
 
-    //TODO: make owned wrapper, for testing and separation
-    private readonly DiscordSocketClient discordSocketClient;
     private readonly PlayersServiceClient playerServiceClient;
-    private readonly FfmpegFactory ffmpegFactory;
+    private readonly IRawAudioSource rawAudioSource;
+    private readonly IAudioConverterFactory converterFactory;
+    private readonly IAudioClient audioClient;
     private readonly ILogger<SessionGrain> logger;
     private readonly Dictionary<Guid, Track[]> activeSearches = new();
 
-    private CancellationTokenSource? cts = new();
+    private CancellationTokenSource playbackCancellation = new();
     private Task? playbackTask;
-    private ulong? currentVoiceChannel;
 
     public SessionGrain(
-        DiscordSocketClient discordSocketClient,
         PlayersServiceClient playerServiceClient,
-        FfmpegFactory ffmpegFactory,
+        IRawAudioSource rawAudioSource,
+        IAudioConverterFactory converterFactory,
+        IAudioClient audioClient,
         ILogger<SessionGrain> logger
     )
     {
-        this.discordSocketClient = discordSocketClient;
         this.playerServiceClient = playerServiceClient;
-        this.ffmpegFactory = ffmpegFactory;
+        this.rawAudioSource = rawAudioSource;
+        this.converterFactory = converterFactory;
+        this.audioClient = audioClient;
         this.logger = logger;
     }
 
-    public ValueTask StartPlay(ulong voiceChannelId)
-    {
-        if (currentVoiceChannel == voiceChannelId)
-            return ValueTask.CompletedTask;
 
-        //TODO: need to do something then connected to another voice channel
-        if (discordSocketClient.GetChannel(voiceChannelId) is not IVoiceChannel channel)
-            throw new Exception();
-        playbackTask = StartPlaybackCore(channel, cts.Token);
-        currentVoiceChannel = voiceChannelId;
-        return ValueTask.CompletedTask;
+    public async ValueTask StartPlay(ulong voiceChannelId)
+    {
+        if (audioClient.ChannelId is { } currentChannelId) // if we are connected to some channel
+        {
+            if (currentChannelId != voiceChannelId) // if it's different channel
+            {
+                if (playbackTask is not null) // if there is something playing
+                {
+                    await WaitPlaybackStop();
+                    RotateCts();
+                }
+
+                await audioClient.ConnectToChannel(voiceChannelId); // connect to required channel
+            }
+
+            playbackTask ??=
+                StartPlaybackCore(
+                    playbackCancellation.Token
+                ); // start playback on connected channel if it's not already started
+
+            return;
+        }
+
+        await audioClient.ConnectToChannel(voiceChannelId);
+        playbackTask = StartPlaybackCore(playbackCancellation.Token);
     }
 
-    private async Task StartPlaybackCore(IAudioChannel voiceChannel, CancellationToken cancellationToken)
-    {
-        // TODO: find a way to handle disconnects gracefully and to cause disconnects
-        using var audioClient = await voiceChannel.ConnectAsync(selfDeaf: true);
 
-        audioClient.Disconnected += OnAudioClientOnDisconnected;
-        try
+    private async Task StartPlaybackCore(CancellationToken cancellationToken)
+    {
+        var dequeueRequest = new DequeueRequest
         {
-            await using var audioOutStream = audioClient.CreatePCMStream(AudioApplication.Music);
-            var dequeueRequest = new DequeueRequest
+            PlayerRequest = new PlayerIdentifier
             {
-                PlayerRequest = new()
-                {
-                    PlayerId = this.GetPrimaryKeyString(),
-                },
-            };
-            while (!cancellationToken.IsCancellationRequested)
+                PlayerId = this.GetPrimaryKeyString(),
+            },
+        };
+        while (audioClient.ChannelId is not null)
+        {
+            try
             {
                 var result = await playerServiceClient.DequeueAsync(
                     dequeueRequest,
                     cancellationToken: cancellationToken
                 );
-                var track = result.Track;
-                if (track is null)
+                if (result.Track is not { } track)
                     break;
-                var audioInStream =
-                    playerServiceClient.Play(
-                        new()
-                        {
-                            AudioSource = track.Source,
-                        },
-                        cancellationToken: cancellationToken
-                    ).ResponseStream.ReadAllAsync(cancellationToken: cancellationToken);
 
-                var ffmpeg = ffmpegFactory.Create(track.Source, in StreamFormat);
+                var audioSource = rawAudioSource.GetAudioPipe(track.Source);
+                var audioConverter = converterFactory.Create(track.Source, in StreamFormat);
 
-                var ffmpegInputTask = StartInPipe(ffmpeg.Input, audioInStream, cancellationToken);
-                var ffmpegOutTask = ffmpeg.Output.CopyToAsync(audioOutStream, cancellationToken);
+                var inPipeTask = audioSource.PipeThrough(audioConverter.Input, cancellationToken);
+                var outPipeTask = audioClient.ConsumeAudioPipe(audioConverter.Output, cancellationToken);
+                var conversionTask = audioConverter.Start(cancellationToken);
 
-                await Task.WhenAll(ffmpegInputTask, ffmpegOutTask, ffmpeg.StartAsync(cancellationToken));
-                await audioOutStream.FlushAsync(cancellationToken);
-
-                //TODO: probably need settings for this
-                await Task.Delay(1000, cancellationToken);
+                await Task.WhenAll(inPipeTask, outPipeTask, conversionTask);
             }
-        }
-        catch (TaskCanceledException)
-        {
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception e)
-        {
-            logger.LogError(e, "Error during playback in session {SessionId}", this.GetPrimaryKeyString());
-        }
-        finally
-        {
-            await audioClient.StopAsync();
-            await voiceChannel.DisconnectAsync();
-            await OnAudioClientOnDisconnected(null!);
-        }
-
-        static async Task StartInPipe(
-            PipeWriter ffmpegInput,
-            IAsyncEnumerable<AudioFrame> audioStream,
-            CancellationToken cancellationToken
-        )
-        {
-            await foreach (var frame in audioStream.WithCancellation(cancellationToken))
+            catch (OperationCanceledException)
             {
-                var result = await ffmpegInput.WriteAsync(frame.Bytes.Memory, cancellationToken);
-                if (result.IsCompleted)
-                    return;
-                if (result.IsCanceled || frame.IsEnd)
-                    break;
+                break;
             }
-
-            await ffmpegInput.CompleteAsync();
+            catch (Exception e)
+            {
+                logger.LogError(e, "Exception during playback in grain {SessionId}", this.GetPrimaryKeyString());
+            }
         }
 
-        Task OnAudioClientOnDisconnected(Exception _)
-        {
-            FireCts();
-            currentVoiceChannel = null;
-            return Task.CompletedTask;
-        }
-    }
-
-    private void FireCts(bool recreate = true)
-    {
-        cts?.Cancel();
-        cts?.Dispose();
-        cts = recreate ? new CancellationTokenSource() : null;
+        playbackTask = null;
     }
 
     public ValueTask<Guid> StartSearch(Track[] searchTracks)
@@ -187,23 +148,35 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
         );
     }
 
-    public async ValueTask Pause()
+    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
-        FireCts();
-        if (playbackTask is not null)
-            await playbackTask;
-        playbackTask = null;
-        currentVoiceChannel = null;
+        await DisposeAsync();
+        await base.OnDeactivateAsync(reason, cancellationToken);
     }
 
     public async ValueTask DisposeAsync()
     {
-        FireCts(false);
+        await WaitPlaybackStop();
+        await audioClient.DisposeAsync();
+        playbackCancellation.Dispose();
+    }
 
+    private async ValueTask WaitPlaybackStop()
+    {
         if (playbackTask is null)
             return;
+        if (!playbackTask.IsCompleted)
+        {
+            playbackCancellation.Cancel(); // cancel playback
+            await playbackTask; // wait for the task to finish
+        }
 
-        await playbackTask;
-        playbackTask = null;
+        playbackTask = null; // null out the task 
+    }
+
+    private void RotateCts()
+    {
+        playbackCancellation.Dispose();
+        playbackCancellation = new CancellationTokenSource();
     }
 }
