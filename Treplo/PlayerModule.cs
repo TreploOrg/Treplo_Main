@@ -56,7 +56,8 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
         }
         
         var session = clusterClient.GetGrain<ISessionGrain>(Context.Guild.Id.ToString());
-        await session.Enqueue(track!);
+        if(query is not null)
+            await session.Enqueue(track!);
         await session.StartPlay(voiceChannel.Id);
         await FollowupAsync("Starting playback");
     }
