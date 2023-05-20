@@ -25,7 +25,7 @@ public sealed class SearchServiceImpl : SearchService.SearchServiceBase
         logger.LogInformation("Started search for query {Query}. Limit: {Limit}", request.Query, request.Limit);
         var tracks = engineManager.SearchAsync(request.Query, context.CancellationToken);
         if (request.HasLimit)
-            tracks = tracks.Take(request.Limit, context.CancellationToken);
+            tracks = tracks.TakeSuccessful(request.Limit, context.CancellationToken);
         await foreach (var track in tracks)
         {
             await track.OnError(static (error, logger) => LogError(logger, error), logger)

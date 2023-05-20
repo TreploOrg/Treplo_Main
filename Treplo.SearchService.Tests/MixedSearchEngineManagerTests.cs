@@ -67,7 +67,7 @@ public class MixedSearchEngineManagerTests
 
         var result = sut.SearchAsync("");
 
-        var actualResult = result.Take(2).ToBlockingEnumerable().Select(
+        var actualResult = result.TakeSuccessful(2).ToBlockingEnumerable().Select(
             (x, i) => x.UnwrapOrDefault()!.SearchEngineName
         ).ToArray();
         

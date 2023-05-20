@@ -90,7 +90,7 @@ internal static class Program
             {
                 var interactionService =
                     new InteractionService(ctx.GetRequiredService<DiscordSocketClient>());
-                interactionService.AddModulesAsync(Assembly.GetExecutingAssembly(), ctx);
+                interactionService.AddModuleAsync<PlayerModule>(ctx);
                 return interactionService;
             }
         );

@@ -4,5 +4,5 @@ namespace Treplo.Converters;
 
 public interface IAudioConverterFactory
 {
-    IAudioConverter Create(AudioSource audioSource, in StreamFormatRequest requiredFormat);
+    IAudioConverter Create(AudioSource audioSource, in StreamFormatRequest requiredFormat, TimeSpan? startTime);
 }

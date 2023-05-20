@@ -12,12 +12,17 @@ public sealed class FfmpegConverter : IAudioConverter
     private readonly Pipe inputPipe = new();
     private readonly Pipe outputPipe = new();
 
-    public FfmpegConverter(string path, AudioSource audioSource, in StreamFormatRequest requiredFormat)
+    public FfmpegConverter(
+        string path,
+        AudioSource audioSource,
+        in StreamFormatRequest requiredFormat,
+        TimeSpan? startTime
+    )
     {
         errorBuilder = new StringBuilder();
         command = Cli.Wrap(path)
             .WithValidation(CommandResultValidation.None)
-            .WithArguments(GetArguments(audioSource, in requiredFormat))
+            .WithArguments(GetArguments(audioSource, in requiredFormat, startTime))
             .WithStandardInputPipe(
                 PipeSource.Create(
                     (destination, cancellationToken)
@@ -57,14 +62,20 @@ public sealed class FfmpegConverter : IAudioConverter
     public PipeReader Output => outputPipe.Reader;
     public PipeWriter Input => inputPipe.Writer;
 
-    private static string GetArguments(AudioSource audioSource, in StreamFormatRequest requiredFormat)
+    private static string GetArguments(
+        AudioSource audioSource,
+        in StreamFormatRequest requiredFormat,
+        TimeSpan? startTime
+    )
     {
         var argumentString = new StringBuilder("-hide_banner -loglevel error ");
 
         var container = audioSource.Container;
         var codec = container.Name == "mp4" ? "aac" : audioSource.Codec.Name;
-        argumentString.Append($"-f {container.Name} -codec {codec} ");
+        argumentString.Append($"-f {container.Name} -codec {codec} -b {audioSource.Bitrate.BitsPerSecond} ");
 
+        if (startTime is { } time)
+            argumentString.Append($"-ss {time}");
 
         argumentString.Append("-i - ");
 

@@ -57,9 +57,10 @@ public sealed class DiscordAudioClient : IAudioClient
 
         currentAudioConnection = new CurrentAudioConnection(cts);
         Exception? localException = null;
+        var outStream = currentConnection.Stream;
         try
         {
-            await audioPipe.CopyToAsync(currentConnection.Stream, cts.Token);
+            await audioPipe.CopyToAsync(outStream, cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -71,7 +72,16 @@ public sealed class DiscordAudioClient : IAudioClient
         finally
         {
             await audioPipe.CompleteAsync(localException);
+        }
+
+        try
+        {
+            await outStream.FlushAsync(cts.Token);
             DisconnectAudio();
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Exception during discord audio stream finalization");
         }
     }
 

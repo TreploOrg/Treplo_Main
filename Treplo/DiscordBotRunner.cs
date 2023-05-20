@@ -104,7 +104,7 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
                         var track = await session.EndSearch(searchId, index);
                         var trackTitle = track.Title;
 
-                        await component.UpdateAsync(x => x.Content = $"Selected track {trackTitle}");
+                        //await component.UpdateAsync(x => x.Content = $"Selected track {trackTitle}");
 
                         var guildUser = component.User as IGuildUser;
                         await session.StartPlay(guildUser.VoiceChannel.Id);
@@ -122,10 +122,10 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
 
     private async Task ClientOnReady()
     {
-        await Task.WhenAll(
-            client.Guilds.AsParallel()
-                .Select(async x => await (Task)interactionService.RegisterCommandsToGuildAsync(x.Id))
-        );
+        foreach (var guild in client.Guilds)
+        {
+            await interactionService.RegisterCommandsToGuildAsync(guild.Id);
+        }
     }
 
     private async Task InteractionServiceOnSlashCommandExecuted(

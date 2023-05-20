@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using Treplo.Common;
 using Treplo.Converters;
 using Treplo.Helpers;
@@ -29,7 +30,8 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
     private readonly IRawAudioSource rawAudioSource;
 
     private CancellationTokenSource playbackCancellation = new();
-    private Task? playbackTask;
+    private Task<LastTrackState?>? playbackTask;
+    private LastTrackState? lastPlaybackNotFinishedState;
 
     public SessionGrain(
         PlayersServiceClient playerServiceClient,
@@ -62,8 +64,7 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
             {
                 if (playbackTask is not null) // if there is something playing
                 {
-                    await WaitPlaybackStop();
-                    RotateCts();
+                    await Pause();
                 }
 
                 await audioClient.ConnectToChannel(voiceChannelId); // connect to required channel
@@ -98,6 +99,12 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
         return track;
     }
 
+    public async ValueTask Pause()
+    {
+        lastPlaybackNotFinishedState = await WaitPlaybackStop();
+        RotateCts();
+    }
+
     public async ValueTask Enqueue(Track track)
     {
         await playerServiceClient.EnqueueAsync(
@@ -113,7 +120,7 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
     }
 
 
-    private async Task StartPlaybackCore(CancellationToken cancellationToken)
+    private async Task<LastTrackState?> StartPlaybackCore(CancellationToken cancellationToken)
     {
         var dequeueRequest = new DequeueRequest
         {
@@ -122,25 +129,18 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
                 PlayerId = this.GetPrimaryKeyString(),
             },
         };
+        Track? lastTrack = null;
+        TimeSpan? lastTrackPlaybackTime = null;
         while (audioClient.ChannelId is not null)
         {
             try
             {
-                var result = await playerServiceClient.DequeueAsync(
-                    dequeueRequest,
-                    cancellationToken: cancellationToken
-                );
-                if (result.Track is not { } track)
+                var result = await GetNextTrack(dequeueRequest, cancellationToken);
+                if (result is not { } track)
                     break;
 
-                var audioSource = rawAudioSource.GetAudioPipe(track.Source);
-                var audioConverter = converterFactory.Create(track.Source, in StreamFormat);
-
-                var inPipeTask = audioSource.PipeThrough(audioConverter.Input, cancellationToken);
-                var outPipeTask = audioClient.ConsumeAudioPipe(audioConverter.Output, cancellationToken);
-                var conversionTask = audioConverter.Start(cancellationToken);
-
-                await Task.WhenAll(inPipeTask, outPipeTask, conversionTask);
+                lastTrack = track.Track;
+                lastTrackPlaybackTime = await PlayTrack(track, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -153,6 +153,46 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
         }
 
         playbackTask = null;
+        return lastTrackPlaybackTime is { } time && lastTrack is not null ? new LastTrackState(lastTrack, time) : null;
+    }
+
+    private async ValueTask<TrackToPlay?> GetNextTrack(
+        DequeueRequest dequeueRequest,
+        CancellationToken cancellationToken
+    )
+    {
+        if (lastPlaybackNotFinishedState is { Track: var track, StopTime: var stopTime })
+            return new TrackToPlay(
+                track,
+                GetStartTime(stopTime)
+            );
+
+        var result = await playerServiceClient.DequeueAsync(
+            dequeueRequest,
+            cancellationToken: cancellationToken
+        );
+
+        if (result.Track is not { } trackResult)
+            return new TrackToPlay(result.Track, null);
+
+        return null;
+
+        static TimeSpan? GetStartTime(TimeSpan timeSpan) => timeSpan.TotalSeconds <= 1
+            ? null
+            : timeSpan - TimeSpan.FromSeconds(1);
+    }
+
+    private async Task<TimeSpan> PlayTrack(TrackToPlay track, CancellationToken cancellationToken)
+    {
+        var audioSource = rawAudioSource.GetAudioPipe(track.Track.Source);
+        var audioConverter = converterFactory.Create(track.Track.Source, in StreamFormat, track.StartTime);
+
+        var inPipeTask = audioSource.PipeThrough(audioConverter.Input, cancellationToken);
+        var outPipeTask = audioClient.ConsumeAudioPipe(audioConverter.Output, cancellationToken);
+        var conversionTask = audioConverter.Start(cancellationToken);
+        var startTime = Stopwatch.GetTimestamp();
+        await Task.WhenAll(inPipeTask, outPipeTask, conversionTask);
+        return Stopwatch.GetElapsedTime(startTime);
     }
 
     public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
@@ -161,17 +201,20 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
         await base.OnDeactivateAsync(reason, cancellationToken);
     }
 
-    private async ValueTask WaitPlaybackStop()
+    private async ValueTask<LastTrackState?> WaitPlaybackStop()
     {
         if (playbackTask is null)
-            return;
+            return null;
+
         if (!playbackTask.IsCompleted)
         {
             playbackCancellation.Cancel(); // cancel playback
             await playbackTask; // wait for the task to finish
         }
 
+        var result = playbackTask.Result;
         playbackTask = null; // null out the task 
+        return result;
     }
 
     private void RotateCts()
@@ -179,4 +222,8 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
         playbackCancellation.Dispose();
         playbackCancellation = new CancellationTokenSource();
     }
+
+    private readonly record struct TrackToPlay(Track Track, TimeSpan? StartTime);
+
+    private readonly record struct LastTrackState(Track Track, TimeSpan StopTime);
 }

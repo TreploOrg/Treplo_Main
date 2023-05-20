@@ -8,4 +8,5 @@ public interface ISessionGrain : IGrainWithStringKey
     ValueTask StartPlay(ulong voiceChannelId);
     ValueTask<Guid> StartSearch(Track[] searchVariants);
     ValueTask<Track> EndSearch(Guid searchId, uint searchResultIndex);
+    ValueTask Pause();
 }

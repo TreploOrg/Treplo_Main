@@ -112,4 +112,18 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
             );
         await FollowupAsync("Select a song to enqueue", components: componentBuilder.Build());
     }
+
+    [SlashCommand("pause", "Pauses currently playing song", true, RunMode.Async)]
+    public async Task Pause()
+    {
+        var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
+        if (voiceChannel is null)
+        {
+            await RespondAsync("User is not in a voice channel");
+            return;
+        }
+
+        var session = clusterClient.GetGrain<ISessionGrain>(Context.Guild.Id.ToString());
+        await session.Pause();
+    }
 }
