@@ -1,0 +1,66 @@
+﻿apiVersion: v1
+kind: List
+items:
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: search-deployment
+      labels:
+        app: search-service
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: search-service
+      template:
+        metadata:
+          annotations:
+            linkerd.io/inject: enabled
+          labels:
+            app: search-service
+        spec:
+          volumes:
+            - name: search-settings
+              configMap:
+                name: search-config
+          containers:
+            - name: search-service-container
+              volumeMounts:
+                - name: search-settings
+                  mountPath: /app/appsettings.json
+                  subPath: appsettings.json
+              resources:
+                  requests:
+                    memory: "100Mi"
+                    cpu: "250m"
+                  limits:
+                    memory: "500Mi"
+                    cpu: "500m"
+              image: cr.yandex/crpuve6pejg4vvqnfrdt/searchservice:latest
+              imagePullPolicy: Always
+              ports:
+                - containerPort: 80
+  - apiVersion: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+    metadata:
+      name: search-service-hpa
+    spec:
+      scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: search-deployment
+      minReplicas: 1
+      maxReplicas: 10
+      metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 85
+        - type: Resource
+          resource:
+            name: memory
+            target:
+              type: Utilization
+              averageUtilization: 90

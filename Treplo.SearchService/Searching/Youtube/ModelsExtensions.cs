@@ -1,5 +1,6 @@
 ﻿using Treplo.Common;
-using YoutubeExplorer.Videos.Streams;
+using YoutubeExplode.Videos.Streams;
+//using YoutubeExplorer.Videos.Streams;
 using Bitrate = Treplo.Common.Bitrate;
 using Container = Treplo.Common.Container;
 
@@ -16,12 +17,12 @@ public static class ModelsExtensions
         Filesize = streamInfo.Size.Into(),
     };
 
-    public static Bitrate Into(in this YoutubeExplorer.Videos.Streams.Bitrate bitrate) => new()
+    public static Bitrate Into(in this YoutubeExplode.Videos.Streams.Bitrate bitrate) => new()
     {
         BitsPerSecond = (ulong)bitrate.BitsPerSecond,
     };
 
-    public static Thumbnail Into(this YoutubeExplorer.Common.Thumbnail thumbnail) => new()
+    public static Thumbnail Into(this YoutubeExplode.Common.Thumbnail thumbnail) => new()
     {
         Url = thumbnail.Url,
     };
@@ -31,7 +32,7 @@ public static class ModelsExtensions
         BytesLength = (ulong)fileSize.Bytes,
     };
 
-    public static Container Into(in this YoutubeExplorer.Videos.Streams.Container container) => new()
+    public static Container Into(in this YoutubeExplode.Videos.Streams.Container container) => new()
     {
         Name = container.Name,
     };

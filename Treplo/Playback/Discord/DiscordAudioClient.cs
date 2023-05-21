@@ -2,6 +2,7 @@
 using Discord;
 using Discord.Audio;
 using Microsoft.Extensions.Logging;
+using Treplo.Helpers;
 using IDiscordAudioClient = Discord.Audio.IAudioClient;
 
 namespace Treplo.Playback.Discord;
@@ -48,36 +49,30 @@ public sealed class DiscordAudioClient : IAudioClient
     public async Task ConsumeAudioPipe(PipeReader audioPipe, CancellationToken cancellationToken)
     {
         if (currentConnection is null)
+        {
+            Console.WriteLine("we're fucked - already connected");
             throw new InvalidOperationException("Client is not connected");
+        }
 
         if (currentAudioConnection is not null)
+        {
+            Console.WriteLine("we're fucked - audio already connected");
             throw new InvalidOperationException("Client already playing audio");
+        }
 
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         currentAudioConnection = new CurrentAudioConnection(cts);
-        Exception? localException = null;
         var outStream = currentConnection.Stream;
-        try
-        {
-            await audioPipe.CopyToAsync(outStream, cts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception e)
-        {
-            localException = e;
-        }
-        finally
-        {
-            await audioPipe.CompleteAsync(localException);
-        }
-
+        await audioPipe.PipeThrough(PipeWriter.Create(new MemoryStream()), cts.Token);
+        Console.WriteLine("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         try
         {
             await outStream.FlushAsync(cts.Token);
             DisconnectAudio();
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception e)
         {
@@ -121,11 +116,11 @@ public sealed class DiscordAudioClient : IAudioClient
     {
         private AudioOutStream? stream;
         public AudioOutStream Stream => stream ??= CurrentAudioClient.CreatePCMStream(AudioApplication.Music);
-
         public async ValueTask DisposeAsync()
         {
-            if (stream is not null)
-                await stream.DisposeAsync();
+            var disposeTask = stream?.DisposeAsync();
+            if (disposeTask is { } task)
+                await task;
             await CurrentAudioClient.StopAsync();
             CurrentAudioClient.Dispose();
         }

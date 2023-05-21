@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace Treplo;
 
-public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDisposable
+public sealed class DiscordBotRunner : IHostedService
 {
     private readonly DiscordSocketClient client;
     private readonly IClusterClient clusterClient;
@@ -34,28 +34,20 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
         this.clusterClient = clusterClient;
         this.settings = settings;
         this.logger = logger;
+    }
 
+    public async Task StartAsync(CancellationToken cancellationToken = default)
+    {
+        await interactionService.AddModuleAsync<PlayerModule>(serviceProvider);
+        
         client.Ready += ClientOnReady;
         client.Log += ClientLog;
         client.InteractionCreated += ClientOnInteractionCreated;
         client.SelectMenuExecuted += ClientOnSelectMenuExecuted;
 
-        this.interactionService.SlashCommandExecuted += InteractionServiceOnSlashCommandExecuted;
-        this.interactionService.Log += InteractionServiceLog;
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await client.DisposeAsync();
-    }
-
-    public void Dispose()
-    {
-        client.Dispose();
-    }
-
-    public async Task StartAsync(CancellationToken cancellationToken = default)
-    {
+        interactionService.SlashCommandExecuted += InteractionServiceOnSlashCommandExecuted;
+        interactionService.Log += InteractionServiceLog;
+        
         await client.LoginAsync(TokenType.Bot, settings.Value.Token);
         await client.StartAsync();
     }
@@ -67,7 +59,6 @@ public sealed class DiscordBotRunner : IHostedService, IDisposable, IAsyncDispos
 
         logger.LogInformation("Performing graceful shutdown");
         await client.LogoutAsync();
-        await DisposeAsync();
     }
 
     private static LogLevel GetSerilogLevel(LogSeverity logMessageSeverity)

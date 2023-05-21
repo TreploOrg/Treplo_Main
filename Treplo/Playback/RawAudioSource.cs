@@ -1,5 +1,6 @@
 ﻿using System.IO.Pipelines;
 using Grpc.Core;
+using Microsoft.Extensions.Logging;
 using Treplo.Common;
 using Treplo.PlayersService;
 
@@ -8,14 +9,20 @@ namespace Treplo.Playback;
 public sealed class RawAudioSource : IRawAudioSource
 {
     private readonly PlayersService.PlayersService.PlayersServiceClient playersServiceClient;
+    private readonly ILogger<RawAudioSource> logger;
 
-    public RawAudioSource(PlayersService.PlayersService.PlayersServiceClient playersServiceClient)
+    public RawAudioSource(
+        PlayersService.PlayersService.PlayersServiceClient playersServiceClient,
+        ILogger<RawAudioSource> logger
+    )
     {
         this.playersServiceClient = playersServiceClient;
+        this.logger = logger;
     }
 
     public PipeReader GetAudioPipe(AudioSource source)
     {
+        logger.LogInformation("Getting audio pipe");
         var cts = new CancellationTokenSource();
         var result = playersServiceClient.Play(
             new PlayRequest
@@ -24,6 +31,7 @@ public sealed class RawAudioSource : IRawAudioSource
             },
             cancellationToken: cts.Token
         );
+        logger.LogInformation("Got audio from player");
         return new AudioStreamReaderPipe(result.ResponseStream.ReadAllAsync(cts.Token), result, cts);
     }
 
@@ -33,6 +41,7 @@ public sealed class RawAudioSource : IRawAudioSource
         private readonly IDisposable callHandle;
         private readonly Pipe innerPipe;
         private CancellationTokenSource? cts;
+        private readonly Task pipeTask;
 
         public AudioStreamReaderPipe(
             IAsyncEnumerable<AudioFrame> audioFramesStream,
@@ -44,7 +53,7 @@ public sealed class RawAudioSource : IRawAudioSource
             this.callHandle = callHandle;
             this.cts = cts;
             innerPipe = new Pipe();
-            _ = AudioPipeCore(cts.Token);
+            pipeTask = AudioPipeCore(cts.Token);
         }
 
         private async Task AudioPipeCore(CancellationToken cancellationToken)
@@ -55,11 +64,15 @@ public sealed class RawAudioSource : IRawAudioSource
             {
                 await foreach (var frame in audioFramesStream)
                 {
+                    Console.WriteLine($"Writing frame with size {frame.Bytes.Memory.Length}");
                     await writer.WriteAsync(frame.Bytes.Memory, cancellationToken);
+                    if (frame.IsEnd)
+                        break;
                 }
             }
             catch (OperationCanceledException)
             {
+                Console.WriteLine("Cancelled audio pipe");
             }
             catch (Exception e)
             {
@@ -88,7 +101,10 @@ public sealed class RawAudioSource : IRawAudioSource
         }
 
         public override ValueTask<ReadResult> ReadAsync(CancellationToken cancellationToken = default)
-            => innerPipe.Reader.ReadAsync(cancellationToken);
+        {
+            Console.WriteLine("Reading from pipe");
+            return innerPipe.Reader.ReadAsync(cancellationToken);
+        }
 
         public override bool TryRead(out ReadResult result) => innerPipe.Reader.TryRead(out result);
 

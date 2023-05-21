@@ -77,6 +77,7 @@ public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
         ServerCallContext context
     )
     {
+        Console.WriteLine("playing audio");
         using var client = clientFactory.CreateClient(nameof(PlayersServiceImpl));
         using var message = new HttpRequestMessage
         {
@@ -106,6 +107,7 @@ public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
             context.CancellationToken
         )) != 0)
         {
+            Console.WriteLine($"writing {read} bytes to stream");
             await responseStream.WriteAsync(
                 new()
                 {

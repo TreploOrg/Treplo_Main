@@ -4,11 +4,17 @@ using SimpleResult;
 using SimpleResult.Extensions;
 using Treplo.Common;
 using Treplo.SearchService.Searching.Errors;
-using YoutubeExplorer;
-using YoutubeExplorer.Common;
-using YoutubeExplorer.Search;
-using YoutubeExplorer.Videos;
-using YoutubeExplorer.Videos.Streams;
+using YoutubeExplode;
+using YoutubeExplode.Common;
+using YoutubeExplode.Search;
+using YoutubeExplode.Videos;
+using YoutubeExplode.Videos.Streams;
+
+// using YoutubeExplorer;
+// using YoutubeExplorer.Common;
+// using YoutubeExplorer.Search;
+// using YoutubeExplorer.Videos;
+// using YoutubeExplorer.Videos.Streams;
 
 namespace Treplo.SearchService.Searching.Youtube;
 

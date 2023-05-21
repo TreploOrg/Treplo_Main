@@ -12,7 +12,7 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.Orleans.Sdk" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Orleans.Sdk" Version="7.1.2" />
     </ItemGroup>
 
     <ItemGroup>

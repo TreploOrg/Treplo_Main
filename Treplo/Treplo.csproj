@@ -6,9 +6,11 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <UserSecretsId>ca10f3c1-c238-4bf1-b16c-6b862d1ae722</UserSecretsId>
+        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="AutoFixture" Version="4.18.0"/>
         <PackageReference Include="CliWrap" Version="3.5.0"/>
         <PackageReference Include="Discord.Net" Version="3.10.0"/>
         <PackageReference Include="Google.Protobuf" Version="3.22.0"/>
@@ -23,10 +25,13 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="7.0.0"/>
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.0"/>
         <PackageReference Include="Microsoft.Extensions.Http" Version="7.0.0"/>
-        <PackageReference Include="Microsoft.Extensions.Options" Version="7.0.0"/>
-        <PackageReference Include="Microsoft.Orleans.Core" Version="7.0.0"/>
-        <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="7.0.0"/>
-        <PackageReference Include="Microsoft.Orleans.Server" Version="7.0.0"/>
+        <PackageReference Include="Microsoft.Extensions.Options" Version="7.0.1"/>
+        <PackageReference Include="Microsoft.Orleans.Core" Version="7.1.2"/>
+        <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="7.1.2"/>
+        <PackageReference Include="Microsoft.Orleans.Hosting.Kubernetes" Version="7.1.2"/>
+        <PackageReference Include="Microsoft.Orleans.Server" Version="7.1.2"/>
+        <PackageReference Include="Orleans.Clustering.Kubernetes" Version="7.1.1"/>
+        <PackageReference Include="Orleans.Providers.MongoDB" Version="7.5.0"/>
         <PackageReference Include="Serilog" Version="2.12.0"/>
         <PackageReference Include="Serilog.Enrichers.Environment" Version="2.2.0"/>
         <PackageReference Include="Serilog.Enrichers.Thread" Version="3.1.0"/>
@@ -43,13 +48,13 @@
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
 
-        <ContentWithTargetPath Include="external\opus.dll">
+        <ContentWithTargetPath Include="external\opus.dll" Condition="Exists('external\opus.dll')">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <TargetPath>opus.dll</TargetPath>
         </ContentWithTargetPath>
         <None Include="external\opus.dll"/>
 
-        <ContentWithTargetPath Include="external\libsodium.dll">
+        <ContentWithTargetPath Include="external\libsodium.dll" Condition="Exists('external\libsodium.dll')">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <TargetPath>libsodium.dll</TargetPath>
         </ContentWithTargetPath>
@@ -62,6 +67,9 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Content Include="..\.dockerignore">
+            <Link>.dockerignore</Link>
+        </Content>
         <Content Include="appsettings.Development.json">
             <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -75,7 +83,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ContentWithTargetPath Include="external\ffmpeg.exe">
+        <ContentWithTargetPath Include="external\ffmpeg.exe" Condition="Exists('external\ffmpeg.exe')">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <TargetPath>ffmpeg.exe</TargetPath>
         </ContentWithTargetPath>

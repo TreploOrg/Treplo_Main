@@ -67,7 +67,7 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
                     await Pause();
                 }
 
-                await audioClient.ConnectToChannel(voiceChannelId); // connect to required channel
+                await ConnectToChannel(voiceChannelId); // connect to required channel
             }
 
             playbackTask ??=
@@ -78,8 +78,18 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
             return;
         }
 
-        await audioClient.ConnectToChannel(voiceChannelId);
+        await ConnectToChannel(voiceChannelId);
         playbackTask = StartPlaybackCore(playbackCancellation.Token);
+
+        async Task ConnectToChannel(ulong channelId)
+        {
+            logger.LogInformation(
+                "Connecting session {SessionId} to voice channel {VoiceChannelId}",
+                this.GetPrimaryKeyString(),
+                channelId
+            );
+            await audioClient.ConnectToChannel(channelId);
+        }
     }
 
     public ValueTask<Guid> StartSearch(Track[] searchTracks)
@@ -122,6 +132,7 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
 
     private async Task<LastTrackState?> StartPlaybackCore(CancellationToken cancellationToken)
     {
+        logger.LogInformation("Starting playback in session {SessionId}", this.GetPrimaryKeyString());
         var dequeueRequest = new DequeueRequest
         {
             PlayerRequest = new PlayerIdentifier
@@ -135,12 +146,18 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
         {
             try
             {
+                logger.LogInformation("Acquiring next track in session {SessionId}", this.GetPrimaryKeyString());
                 var result = await GetNextTrack(dequeueRequest, cancellationToken);
                 if (result is not { } track)
+                {
+                    logger.LogInformation("No next track in session {SessionId}", this.GetPrimaryKeyString());
                     break;
+                }
 
+                logger.LogInformation("Acquired track {TrackTitle} in session {SessionId}", track.Track.Title, this.GetPrimaryKeyString());
                 lastTrack = track.Track;
                 lastTrackPlaybackTime = await PlayTrack(track, cancellationToken);
+                logger.LogInformation("Track {TrackTitle} finished in session {SessionId}", track.Track.Title, this.GetPrimaryKeyString());
             }
             catch (OperationCanceledException)
             {
@@ -172,8 +189,8 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
             cancellationToken: cancellationToken
         );
 
-        if (result.Track is not { } trackResult)
-            return new TrackToPlay(result.Track, null);
+        if (result.Track is { } trackResult)
+            return new TrackToPlay(trackResult, null);
 
         return null;
 
@@ -184,13 +201,19 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
 
     private async Task<TimeSpan> PlayTrack(TrackToPlay track, CancellationToken cancellationToken)
     {
+        Console.WriteLine("Acquiring audio pipe");
         var audioSource = rawAudioSource.GetAudioPipe(track.Track.Source);
+        Console.WriteLine("Acquiring converter");
         var audioConverter = converterFactory.Create(track.Track.Source, in StreamFormat, track.StartTime);
 
+        Console.WriteLine("Starting pipe in converter");
         var inPipeTask = audioSource.PipeThrough(audioConverter.Input, cancellationToken);
+        Console.WriteLine("Starting pipe out of converter");
         var outPipeTask = audioClient.ConsumeAudioPipe(audioConverter.Output, cancellationToken);
+        Console.WriteLine("Starting converter");
         var conversionTask = audioConverter.Start(cancellationToken);
         var startTime = Stopwatch.GetTimestamp();
+        Console.WriteLine("Waiting for tasks");
         await Task.WhenAll(inPipeTask, outPipeTask, conversionTask);
         return Stopwatch.GetElapsedTime(startTime);
     }
@@ -203,18 +226,18 @@ public sealed class SessionGrain : Grain, ISessionGrain, IAsyncDisposable
 
     private async ValueTask<LastTrackState?> WaitPlaybackStop()
     {
-        if (playbackTask is null)
+        var local = Interlocked.Exchange(ref playbackTask, null);
+        if (local is null)
             return null;
 
-        if (!playbackTask.IsCompleted)
+        if (!local.IsCompleted)
         {
             playbackCancellation.Cancel(); // cancel playback
-            await playbackTask; // wait for the task to finish
+            await local; // wait for the task to finish
         }
-
-        var result = playbackTask.Result;
+        
         playbackTask = null; // null out the task 
-        return result;
+        return local.Result;
     }
 
     private void RotateCts()

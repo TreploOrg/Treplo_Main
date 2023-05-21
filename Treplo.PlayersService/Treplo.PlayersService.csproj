@@ -4,6 +4,7 @@
         <TargetFramework>net7.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
+        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     </PropertyGroup>
 
     <ItemGroup>
@@ -13,9 +14,12 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.Orleans.Core" Version="7.0.0" />
-        <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="7.0.0" />
-        <PackageReference Include="Microsoft.Orleans.Server" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Orleans.Core" Version="7.1.2" />
+        <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="7.1.2" />
+        <PackageReference Include="Microsoft.Orleans.Hosting.Kubernetes" Version="7.1.2" />
+        <PackageReference Include="Microsoft.Orleans.Server" Version="7.1.2" />
+        <PackageReference Include="Orleans.Clustering.Kubernetes" Version="7.1.1" />
+        <PackageReference Include="Orleans.Providers.MongoDB" Version="7.5.0" />
         <PackageReference Include="Serilog.Enrichers.Environment" Version="2.2.0" />
         <PackageReference Include="Serilog.Enrichers.Thread" Version="3.1.0" />
     </ItemGroup>
@@ -27,6 +31,12 @@
 
     <ItemGroup>
         <Protobuf Include="..\Treplo_Api\v1\proto\players_service.proto" GrpcServices="Server" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="..\.dockerignore">
+        <Link>.dockerignore</Link>
+      </Content>
     </ItemGroup>
 
 </Project>

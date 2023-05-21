@@ -1,5 +1,8 @@
-﻿using YoutubeExplorer.Search;
-using YoutubeExplorer.Videos;
+﻿// using YoutubeExplorer.Search;
+// using YoutubeExplorer.Videos;
+
+using YoutubeExplode.Search;
+using YoutubeExplode.Videos;
 
 namespace Treplo.SearchService.Searching.Errors;
 

@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Orleans.Clustering.Kubernetes;
+using Orleans.Configuration;
 using Serilog;
 using Treplo.Common.OrleansGrpcConnector;
 using Treplo.Infrastructure.AspNet;
@@ -15,11 +17,9 @@ builder.Services
     .AddGrpcReflection()
     .AddHttpClient()
     .AddConverters();
-builder.Host.UseOrleans(
-    x
-        => x.UseLocalhostClustering()
-            .AddMemoryGrainStorageAsDefault()
-);
+    //.AddMongoDBClient("mongodb://treplo:12345678@rc1b-8x8nuotv1zj5ijck.mdb.yandexcloud.net:27018/treplo-db");
+
+builder.Host.UseOrleans(ConfigureOrleans);
 
 var app = builder.Build();
 app.SetupSwaggerEndpoints()
@@ -31,3 +31,19 @@ if (app.Environment.IsDevelopment())
     app.MapGrpcReflectionService();
 
 await app.RunAsync();
+
+static void ConfigureOrleans(HostBuilderContext ctx, ISiloBuilder builder)
+{
+    if (ctx.HostingEnvironment.IsDevelopment() || true)
+    {
+        builder.UseLocalhostClustering()
+            .AddMemoryGrainStorageAsDefault();
+        
+        return;
+    }
+    
+    builder
+        .UseKubeMembership()
+        .AddMongoDBGrainStorageAsDefault(x => x.DatabaseName = "treplo-db")
+        .UseKubernetesHosting();
+}

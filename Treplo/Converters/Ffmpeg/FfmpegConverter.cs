@@ -11,6 +11,7 @@ public sealed class FfmpegConverter : IAudioConverter
     private readonly StringBuilder errorBuilder;
     private readonly Pipe inputPipe = new();
     private readonly Pipe outputPipe = new();
+    private readonly string arguments;
 
     public FfmpegConverter(
         string path,
@@ -20,9 +21,10 @@ public sealed class FfmpegConverter : IAudioConverter
     )
     {
         errorBuilder = new StringBuilder();
+        arguments = GetArguments(audioSource, in requiredFormat, startTime);
         command = Cli.Wrap(path)
             .WithValidation(CommandResultValidation.None)
-            .WithArguments(GetArguments(audioSource, in requiredFormat, startTime))
+            .WithArguments(arguments)
             .WithStandardInputPipe(
                 PipeSource.Create(
                     (destination, cancellationToken)
@@ -43,9 +45,11 @@ public sealed class FfmpegConverter : IAudioConverter
         Exception? localException = null;
         try
         {
+            Console.WriteLine("executing ffmpeg");
             var result = await command.ExecuteAsync(cancellationToken);
+            Console.WriteLine("executed ffmpeg");
             if (result.ExitCode != 0 || errorBuilder.Length > 0)
-                throw new FfmpegPipingException(errorBuilder.ToString());
+                throw new FfmpegPipingException(errorBuilder.ToString(), arguments);
         }
         catch (Exception e)
         {
@@ -54,6 +58,7 @@ public sealed class FfmpegConverter : IAudioConverter
         }
         finally
         {
+            Console.WriteLine("exception ffmpeg");
             await inputPipe.Reader.CompleteAsync(localException);
             await outputPipe.Writer.CompleteAsync(localException);
         }
@@ -72,16 +77,16 @@ public sealed class FfmpegConverter : IAudioConverter
 
         var container = audioSource.Container;
         var codec = container.Name == "mp4" ? "aac" : audioSource.Codec.Name;
-        argumentString.Append($"-f {container.Name} -codec {codec} -b {audioSource.Bitrate.BitsPerSecond} ");
+        argumentString.Append($"-f {container.Name} -codec {codec} ");
 
         if (startTime is { } time)
-            argumentString.Append($"-ss {time}");
+            argumentString.Append($"-ss {time} ");
 
         argumentString.Append("-i - ");
 
         AppendStreamRequest(in requiredFormat, argumentString);
 
-        return argumentString.Append('-').ToString();
+        return argumentString.Append("-").ToString();
 
         static void AppendStreamRequest(in StreamFormatRequest streamFormatRequest, StringBuilder stringBuilder)
         {
@@ -99,7 +104,12 @@ public sealed class FfmpegConverter : IAudioConverter
 
 public class FfmpegPipingException : Exception
 {
-    public FfmpegPipingException(string message) : base(message)
+    public string Arguments { get; }
+
+    public FfmpegPipingException(string message, string arguments) : base(GetMessage(message, arguments))
     {
+        Arguments = arguments;
     }
+
+    private static string GetMessage(string message, string arguments) => $"With arguments \"{arguments}\": {message}";
 }

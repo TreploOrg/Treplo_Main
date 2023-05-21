@@ -1,0 +1,94 @@
+﻿apiVersion: v1
+kind: List
+items:
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: players-deployment
+      labels:
+        orleans/serviceId: players-silo
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          orleans/serviceId: players-silo
+      template:
+        metadata:
+          annotations:
+            linkerd.io/inject: enabled
+          labels:
+            orleans/serviceId: players-silo
+            orleans/clusterId: players-silo
+        spec:
+          serviceAccountName: orleanssilo
+          volumes:
+            - name: players-settings
+              configMap:
+                name: players-config
+          terminationGracePeriodSeconds: 180
+          containers:
+            - name: players-silo-container
+              image: cr.yandex/crpuve6pejg4vvqnfrdt/playerservice:latest
+              imagePullPolicy: Always
+              env:
+                - name: ORLEANS_SERVICE_ID
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.labels['orleans/serviceId']
+                - name: ORLEANS_CLUSTER_ID
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.labels['orleans/clusterId']
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: POD_IP
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.podIP
+                - name: DOTNET_SHUTDOWNTIMEOUTSECONDS
+                  value: "120"
+              ports:
+                - containerPort: 11111
+                - containerPort: 30000
+                - containerPort: 80
+              volumeMounts:
+                - name: players-settings
+                  mountPath: /app/appsettings.json
+                  subPath: appsettings.json
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "500m"
+                limits:
+                  memory: "1000Mi"
+                  cpu: "1"
+  - apiVersion: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+    metadata:
+      name: players-silo-hpa
+    spec:
+      scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: players-deployment
+      minReplicas: 1
+      maxReplicas: 10
+      metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 85
+        - type: Resource
+          resource:
+            name: memory
+            target:
+              type: Utilization
+              averageUtilization: 90
