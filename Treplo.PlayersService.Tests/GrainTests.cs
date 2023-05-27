@@ -1,9 +1,9 @@
-using Treplo.PlayersService.Grains;
+using AutoFixture;
 using FakeItEasy;
+using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Treplo.Common;
-using FluentAssertions;
-using AutoFixture;
+using Treplo.PlayersService.Grains;
 
 namespace Treplo.PlayersService.Tests;
 
@@ -18,7 +18,7 @@ public class Tests
     {
         grain = new PlayerGrain(fakeLogger);
     }
-    
+
     [Test]
     public async Task Enqueue_AddOneTrack_ActuallyAddTrack()
     {
@@ -28,18 +28,20 @@ public class Tests
         actual.Should().OnlyContain(x => x == track);
         actual.Should().HaveCount(1);
     }
-    
+
     [Test]
     public async Task Enqueue_AddSeveralTrack_ActuallyAddTrack()
     {
         var tracks = fixture.CreateMany<Track>(5).ToArray();
         foreach (var track in tracks)
+        {
             await grain.Enqueue(track);
-        
+        }
+
         var actual = await grain.GetQueue();
         actual.Should().Equal(tracks);
     }
-    
+
     [Test]
     public async Task Dequeue_RemoveTrack_ReturnSame()
     {
@@ -48,26 +50,28 @@ public class Tests
         var actual = await grain.Dequeue();
         actual.Should().Be(track);
     }
-    
+
     [Test]
     public async Task Dequeue_RemoveSomeTrack_ReturnSame()
     {
         var tracks = fixture.CreateMany<Track>(5).ToArray();
         foreach (var track in tracks)
+        {
             await grain.Enqueue(track);
+        }
 
         var actual = new List<Track>();
         while (true)
         {
             var t = await grain.Dequeue();
             if (t == null) break;
-            
+
             actual.Add((Track)t);
         }
-        
+
         actual.Should().Equal(tracks);
     }
-    
+
     [Test]
     public async Task Dequeue_RemoveTrack_ActuallyRemove()
     {
@@ -77,7 +81,7 @@ public class Tests
         var actual = await grain.GetQueue();
         actual.Should().HaveCount(0);
     }
-    
+
     [Test]
     public async Task Dequeue_RemoveTrackFromEmpty_ReturnNull()
     {

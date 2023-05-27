@@ -7,7 +7,7 @@ public readonly struct Bitrate
     {
         BitsPerSecond = bitsPerSecond;
     }
-    
+
     [Id(0)] public readonly ulong BitsPerSecond;
 }
 

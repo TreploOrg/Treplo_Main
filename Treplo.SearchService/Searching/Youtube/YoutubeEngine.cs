@@ -1,7 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 using Google.Protobuf.WellKnownTypes;
 using SimpleResult;
-using SimpleResult.Extensions;
 using Treplo.Common;
 using Treplo.SearchService.Searching.Errors;
 using YoutubeExplode;

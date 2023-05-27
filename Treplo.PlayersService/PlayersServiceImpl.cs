@@ -7,16 +7,29 @@ namespace Treplo.PlayersService;
 
 public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
 {
-    private readonly IClusterClient clusterClient;
-    private readonly IHttpClientFactory clientFactory;
+    private static readonly EnqueueResult EnqueueResult = new();
 
-    public PlayersServiceImpl(IClusterClient clusterClient, IHttpClientFactory clientFactory)
+
+    private static readonly string musicCache = $"{AppContext.BaseDirectory}/music";
+    private readonly IHttpClientFactory clientFactory;
+    private readonly IClusterClient clusterClient;
+    private readonly ILogger<PlayersServiceImpl> logger;
+
+    static PlayersServiceImpl()
+    {
+        Directory.CreateDirectory(musicCache);
+    }
+
+    public PlayersServiceImpl(
+        IClusterClient clusterClient,
+        IHttpClientFactory clientFactory,
+        ILogger<PlayersServiceImpl> logger
+    )
     {
         this.clusterClient = clusterClient;
         this.clientFactory = clientFactory;
+        this.logger = logger;
     }
-
-    private static readonly EnqueueResult EnqueueResult = new();
 
     public override async Task<EnqueueResult> Enqueue(EnqueueRequest request, ServerCallContext context)
     {
@@ -28,7 +41,7 @@ public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
     public override async Task<DequeueResult> Dequeue(DequeueRequest request, ServerCallContext context)
     {
         var grain = clusterClient.GetGrain<IPlayerGrain>(request.PlayerRequest.PlayerId);
-        return new()
+        return new DequeueResult
         {
             Track = await grain.Dequeue(),
         };
@@ -38,7 +51,7 @@ public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
     {
         var grain = clusterClient.GetGrain<IPlayerGrain>(request.PlayerRequest.PlayerId);
 
-        return new()
+        return new LoopResult
         {
             Loop = await grain.SwitchLoop(),
         };
@@ -48,9 +61,9 @@ public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
     {
         var grain = clusterClient.GetGrain<IPlayerGrain>(request.PlayerRequest.PlayerId);
 
-        return new()
+        return new ShuffleResult
         {
-            Queue = new()
+            Queue = new Queue
             {
                 Tracks = { await grain.Shuffle() },
             },
@@ -61,10 +74,10 @@ public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
     {
         var grain = clusterClient.GetGrain<IPlayerGrain>(request.PlayerRequest.PlayerId);
 
-        return new()
+        return new PlayerState
         {
             Loop = await grain.GetLoopState(),
-            Queue = new()
+            Queue = new Queue
             {
                 Tracks = { await grain.GetQueue() },
             },
@@ -77,14 +90,36 @@ public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
         ServerCallContext context
     )
     {
-        Console.WriteLine("playing audio");
+        var frameSize = request.AudioSource.Bitrate.BitsPerSecond / 8;
+        if (frameSize >= int.MaxValue)
+            frameSize = int.MaxValue / 2;
+
+        try
+        {
+            var cachePath = Path.GetTempFileName();
+
+            await ReadFromUrl(responseStream, context, cachePath, frameSize, request);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task ReadFromUrl(
+        IServerStreamWriter<AudioFrame> responseStream,
+        ServerCallContext context,
+        string cachePath,
+        ulong frameSize,
+        PlayRequest request
+    )
+    {
+        await using var cachePipe = new FilePipe(cachePath);
         using var client = clientFactory.CreateClient(nameof(PlayersServiceImpl));
         using var message = new HttpRequestMessage
         {
             Method = HttpMethod.Get,
             RequestUri = new Uri(request.AudioSource.Url),
         };
-
         using var response = await client.SendAsync(
             message,
             HttpCompletionOption.ResponseHeadersRead,
@@ -92,30 +127,143 @@ public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
         );
 
         response.EnsureSuccessStatusCode();
-
-        var frameSize = request.AudioSource.Bitrate.BitsPerSecond / 8;
-        if (frameSize >= int.MaxValue)
-            frameSize = int.MaxValue / 2;
-        using var buffer = MemoryPool<byte>.Shared.Rent((int)frameSize);
         await using var stream = await response.Content.ReadAsStreamAsync(context.CancellationToken);
 
-        var read = 0;
-        while ((read = await stream.ReadAtLeastAsync(
-            buffer.Memory,
+        var copyToCacheTask = CopyToCacheTask(stream, cachePipe.Writer, context.CancellationToken);
+        logger.LogDebug("Starting wait");
+        await Task.Delay(500, context.CancellationToken);
+        var outputTask = StartOutputStream(
+            responseStream,
             (int)frameSize,
-            false,
+            cachePipe.Reader,
+            static pipe => pipe.ShouldTryRead,
+            cachePipe,
             context.CancellationToken
-        )) != 0)
+        );
+
+        await Task.WhenAll(copyToCacheTask, outputTask);
+    }
+
+    private async Task CopyToCacheTask(
+        Stream stream,
+        FilePipe.NotifyingWrapper writer,
+        CancellationToken cancellationToken
+    )
+    {
+        await using (writer)
         {
-            Console.WriteLine($"writing {read} bytes to stream");
-            await responseStream.WriteAsync(
-                new()
+            try
+            {
+                logger.LogDebug("Started copying");
+                await stream.CopyToAsync(writer.Stream);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Error during audio receiving from source");
+            }
+            finally
+            {
+                logger.LogDebug("Finished downloading audio");
+            }
+        }
+    }
+
+    private async Task StartOutputStream<T>(
+        IServerStreamWriter<AudioFrame> serverStreamWriter,
+        int frameSize,
+        Stream reader,
+        Func<T, bool> shouldTryReadNext,
+        T data,
+        CancellationToken cancellationToken
+    )
+    {
+        logger.LogDebug("Started output");
+        using var buffer = MemoryPool<byte>.Shared.Rent(frameSize);
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var readResult = await reader.ReadAtLeastAsync(buffer.Memory, frameSize, false, cancellationToken);
+                var isEnd = readResult < frameSize;
+                if (readResult != 0)
                 {
-                    Bytes = UnsafeByteOperations.UnsafeWrap(buffer.Memory[..read]),
-                    IsEnd = frameSize > (ulong)read,
-                },
-                context.CancellationToken
-            );
+                    logger.LogError("Got buffer");
+                    await serverStreamWriter.WriteAsync(
+                        new AudioFrame
+                        {
+                            Bytes = UnsafeByteOperations.UnsafeWrap(buffer.Memory[..readResult]),
+                            IsEnd = isEnd && !shouldTryReadNext(data),
+                        },
+                        cancellationToken
+                    );
+                }
+
+                if (isEnd && shouldTryReadNext(data))
+                    await Task.Delay(100, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Error during sending audio to client");
+        }
+        finally
+        {
+            logger.LogDebug("Sent all audio");
+        }
+    }
+}
+
+internal class FilePipe : IAsyncDisposable
+{
+    private readonly string path;
+    private int shouldTryRead = 1;
+
+    public FilePipe(string path)
+    {
+        this.path = path;
+        Writer = new NotifyingWrapper(File.Open(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite), this);
+        Reader = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+    }
+
+    public Stream Reader { get; }
+    public NotifyingWrapper Writer { get; }
+
+    public bool ShouldTryRead => shouldTryRead == 1;
+
+    public async ValueTask DisposeAsync()
+    {
+        await Writer.DisposeAsync();
+        await Reader.DisposeAsync();
+        File.Delete(path);
+    }
+
+    private void CompleteWriter()
+    {
+        Interlocked.Exchange(ref shouldTryRead, 0);
+    }
+
+    public class NotifyingWrapper : IAsyncDisposable
+    {
+        private readonly FilePipe pipe;
+
+        public NotifyingWrapper(Stream stream, FilePipe pipe)
+        {
+            this.pipe = pipe;
+            Stream = stream;
+        }
+
+        public Stream Stream { get; }
+
+        public async ValueTask DisposeAsync()
+        {
+            await Stream.DisposeAsync();
+            pipe.CompleteWriter();
         }
     }
 }

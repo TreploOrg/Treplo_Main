@@ -16,7 +16,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Treplo.SearchService.Tests"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{C9BFD243-DC88-4030-8932-C1CE9A42E80F}"
 	ProjectSection(SolutionItems) = preProject
-		docker-compose.yml = docker-compose.yml
 		k8s-account.yaml = k8s-account.yaml
 		k8s-resources.yaml = k8s-resources.yaml
 	EndProjectSection

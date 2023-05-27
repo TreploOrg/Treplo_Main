@@ -16,15 +16,12 @@ public class MixedSearchEngineManager : ISearchEngineManager
     public IAsyncEnumerable<Result<TrackSearchResult, Error>> SearchAsync(
         string searchQuery,
         CancellationToken cancellationToken = default
-    )
-    {
-        return new Enumerable(searchQuery, engines, cancellationToken);
-    }
+    ) => new Enumerable(searchQuery, engines, cancellationToken);
 
     private class Enumerable : IAsyncEnumerable<Result<TrackSearchResult, Error>>
     {
-        private readonly string query;
         private readonly ICollection<ISearchEngine> engines;
+        private readonly string query;
         private readonly CancellationToken searchToken;
 
         public Enumerable(string query, ICollection<ISearchEngine> engines, CancellationToken searchToken)
@@ -100,16 +97,14 @@ public class MixedSearchEngineManager : ISearchEngineManager
 
     private class Enumerator : IAsyncEnumerator<Result<TrackSearchResult, Error>>
     {
-        private readonly string query;
-        private readonly ChannelReader<Result<TrackSearchResult, Error>> tracksReader;
         private readonly CancellationTokenSource cancellationTokenSource;
+        private readonly string query;
         private readonly Task searchTask;
+        private readonly ChannelReader<Result<TrackSearchResult, Error>> tracksReader;
+        private Result<TrackSearchResult, Error> current;
 
         private bool readAvailable;
         private bool threw;
-        private Result<TrackSearchResult, Error> current;
-
-        public Result<TrackSearchResult, Error> Current => current;
 
         public Enumerator(
             string query,
@@ -124,6 +119,8 @@ public class MixedSearchEngineManager : ISearchEngineManager
             this.searchTask = searchTask;
         }
 
+        public Result<TrackSearchResult, Error> Current => current;
+
         public async ValueTask<bool> MoveNextAsync()
         {
             while (true)
@@ -131,7 +128,6 @@ public class MixedSearchEngineManager : ISearchEngineManager
                 if (cancellationTokenSource.IsCancellationRequested)
                     return false;
                 if (!readAvailable && !threw)
-                {
                     try
                     {
                         readAvailable = await tracksReader.WaitToReadAsync(cancellationTokenSource.Token);
@@ -146,7 +142,6 @@ public class MixedSearchEngineManager : ISearchEngineManager
                         threw = true;
                         return true;
                     }
-                }
 
                 if (!readAvailable || threw) return false;
 

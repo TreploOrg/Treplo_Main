@@ -12,7 +12,11 @@ public sealed class FfmpegConverterFactory : IAudioConverterFactory
         this.options = options;
     }
 
-    IAudioConverter IAudioConverterFactory.Create(AudioSource audioSource, in StreamFormatRequest requiredFormat, TimeSpan? startTime)
+    IAudioConverter IAudioConverterFactory.Create(
+        AudioSource audioSource,
+        in StreamFormatRequest requiredFormat,
+        TimeSpan? startTime
+    )
         => Create(audioSource, in requiredFormat, startTime);
 
     public FfmpegConverter Create(AudioSource audioSource, in StreamFormatRequest requiredFormat, TimeSpan? startTime)

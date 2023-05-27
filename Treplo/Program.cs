@@ -1,5 +1,4 @@
 ﻿using System.Reflection;
-using AutoFixture;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
@@ -9,10 +8,9 @@ using Grpc.Net.Client.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MongoDB.Driver;
 using Orleans.Clustering.Kubernetes;
-using Treplo.Common;
 using Treplo.Common.OrleansGrpcConnector;
 using Treplo.Converters;
 using Treplo.Converters.Ffmpeg;
@@ -20,7 +18,7 @@ using Treplo.Infrastructure.AspNet;
 using Treplo.Infrastructure.Configuration;
 using Treplo.Playback;
 using Treplo.Playback.Discord;
-using Treplo.PlayersService;
+using Treplo.Player;
 
 namespace Treplo;
 
@@ -33,21 +31,27 @@ internal static class Program
             .BindOption<SearchServiceClientSettings>()
             .BindOption<PlayerServiceClientSettings>()
             .BindOption<DiscordClientSettings>()
+            .BindOption<MongoSettings>()
             .UseOrleans(ConfigureOrleans)
             .ConfigureServices(
                 (hostCtx, services) =>
                 {
                     services.AddConverters()
                         .AddSingleton<IAudioConverterFactory, FfmpegConverterFactory>();
-                        // .AddMongoDBClient(
-                        //     "mongodb://treplo:12345678@rc1b-8x8nuotv1zj5ijck.mdb.yandexcloud.net:27018/treplo-db"
-                        // );
+                    if (!hostCtx.HostingEnvironment.IsDevelopment())
+                        services.AddMongoDBClient(
+                            x => MongoClientSettings.FromConnectionString(
+                                x.GetRequiredService<IOptions<MongoSettings>>().Value.ConnectionString
+                            )
+                        );
                     services.AddScoped<IAudioClient, DiscordAudioClient>();
+                    services.AddScoped<IPlayerFactory, PlayerFactory>();
                     services.AddSingleton<IRawAudioSource, RawAudioSource>();
                     SetupDiscordBot(services, hostCtx);
                     services.AddSingleton<IDateTimeManager, DateTimeManager>();
                     services.AddSingleton<ResolverFactory>(
-                        sp => new DnsResolverFactory(refreshInterval: TimeSpan.FromSeconds(60)));
+                        sp => new DnsResolverFactory(TimeSpan.FromSeconds(60))
+                    );
                     services.AddGrpcClient<SearchService.SearchService.SearchServiceClient>(
                         static (services, options) =>
                         {
@@ -89,14 +93,14 @@ internal static class Program
 
     private static void ConfigureOrleans(HostBuilderContext ctx, ISiloBuilder builder)
     {
-        if (ctx.HostingEnvironment.IsDevelopment() || true)
+        if (ctx.HostingEnvironment.IsDevelopment())
         {
             builder.UseLocalhostClustering()
                 .AddMemoryGrainStorageAsDefault();
-        
+
             return;
         }
-    
+
         builder
             .UseKubeMembership()
             .AddMongoDBGrainStorageAsDefault(x => x.DatabaseName = "treplo-db")

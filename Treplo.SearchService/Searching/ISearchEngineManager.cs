@@ -5,5 +5,8 @@ namespace Treplo.SearchService.Searching;
 
 public interface ISearchEngineManager
 {
-    IAsyncEnumerable<Result<TrackSearchResult, Error>> SearchAsync(string searchQuery, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<Result<TrackSearchResult, Error>> SearchAsync(
+        string searchQuery,
+        CancellationToken cancellationToken = default
+    );
 }

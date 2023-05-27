@@ -2,7 +2,7 @@
 
 namespace Treplo;
 
-public interface ISessionGrain : IGrainWithStringKey
+public interface ISessionGrain : IGrainWithIntegerKey
 {
     ValueTask Enqueue(Track track);
     ValueTask StartPlay(ulong voiceChannelId);

@@ -4,6 +4,7 @@ using Discord.WebSocket;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Treplo.Helpers;
 
 namespace Treplo;
 
@@ -39,7 +40,7 @@ public sealed class DiscordBotRunner : IHostedService
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         await interactionService.AddModuleAsync<PlayerModule>(serviceProvider);
-        
+
         client.Ready += ClientOnReady;
         client.Log += ClientLog;
         client.InteractionCreated += ClientOnInteractionCreated;
@@ -47,7 +48,7 @@ public sealed class DiscordBotRunner : IHostedService
 
         interactionService.SlashCommandExecuted += InteractionServiceOnSlashCommandExecuted;
         interactionService.Log += InteractionServiceLog;
-        
+
         await client.LoginAsync(TokenType.Bot, settings.Value.Token);
         await client.StartAsync();
     }
@@ -91,7 +92,7 @@ public sealed class DiscordBotRunner : IHostedService
                     try
                     {
                         var session =
-                            clusterClient.GetGrain<ISessionGrain>(component.GuildId.GetValueOrDefault().ToString());
+                            clusterClient.GetGrain(component.GuildId.GetValueOrDefault());
                         var track = await session.EndSearch(searchId, index);
                         var trackTitle = track.Title;
 

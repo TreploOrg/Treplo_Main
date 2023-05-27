@@ -16,7 +16,7 @@ public static class ServiceCollectionExtensions
                         null
                     )
                 )
-            ).SelectMany(pair => pair.interfaces.Select(x => (type: pair.type, @interface: x)));
+            ).SelectMany(pair => pair.interfaces.Select(x => (pair.type, @interface: x)));
 
         foreach (var (t, i) in types)
         {

@@ -30,12 +30,12 @@ items:
                   mountPath: /app/appsettings.json
                   subPath: appsettings.json
               resources:
-                  requests:
-                    memory: "100Mi"
-                    cpu: "250m"
-                  limits:
-                    memory: "500Mi"
-                    cpu: "500m"
+                requests:
+                  memory: "100Mi"
+                  cpu: "250m"
+                limits:
+                  memory: "500Mi"
+                  cpu: "500m"
               image: cr.yandex/crpuve6pejg4vvqnfrdt/searchservice:latest
               imagePullPolicy: Always
               ports:

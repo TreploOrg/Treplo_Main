@@ -1,4 +1,7 @@
-﻿FROM ubuntu AS cpp_compile
+﻿FROM mcr.microsoft.com/dotnet/aspnet:7.0 AS base
+WORKDIR /app
+
+FROM base AS cpp_compile
 RUN apt-get update && apt-get install wget gcc make -y
 
 FROM cpp_compile AS opus
@@ -29,9 +32,6 @@ RUN \
     make install && \
     cd .. && \
     cp /usr/local/lib/libsodium.so libsodium
-
-FROM mcr.microsoft.com/dotnet/aspnet:7.0 AS base
-WORKDIR /app
 
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /src

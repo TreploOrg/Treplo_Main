@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http;
 using SimpleResult;
 using Treplo.SearchService.Helpers;
 using Treplo.SearchService.Searching;
@@ -9,10 +8,6 @@ namespace Treplo.SearchService.Tests;
 [TestFixture]
 public class MixedSearchEngineManagerTests
 {
-    private ISearchEngine firstEngine = null!;
-    private ISearchEngine secondEngine = null!;
-    private ISearchEngineManager sut = null!;
-
     [SetUp]
     public void Setup()
     {
@@ -20,6 +15,10 @@ public class MixedSearchEngineManagerTests
         secondEngine = A.Fake<ISearchEngine>();
         sut = new MixedSearchEngineManager(new[] { firstEngine, secondEngine });
     }
+
+    private ISearchEngine firstEngine = null!;
+    private ISearchEngine secondEngine = null!;
+    private ISearchEngineManager sut = null!;
 
     [Test]
     public void Manager_Should_ReturnTracks_AsProduced()
@@ -70,7 +69,7 @@ public class MixedSearchEngineManagerTests
         var actualResult = result.TakeSuccessful(2).ToBlockingEnumerable().Select(
             (x, i) => x.UnwrapOrDefault()!.SearchEngineName
         ).ToArray();
-        
+
         actualResult.Should().ContainInOrder(nameof(secondEngine), nameof(firstEngine)).And.HaveCount(2);
         reachedThird.Should().BeFalse("enumeration stopped before");
 

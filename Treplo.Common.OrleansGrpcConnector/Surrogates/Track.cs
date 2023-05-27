@@ -32,8 +32,8 @@ public readonly struct Track
 [RegisterConverter]
 public sealed class TrackConverter : IConverter<Common.Track, Track>
 {
-    private readonly IConverter<Common.Thumbnail, Thumbnail> thumbnailConverter;
     private readonly IConverter<Common.AudioSource, AudioSource> audioSourceConverter;
+    private readonly IConverter<Common.Thumbnail, Thumbnail> thumbnailConverter;
 
     public TrackConverter(
         IConverter<Common.Thumbnail, Thumbnail> thumbnailConverter,

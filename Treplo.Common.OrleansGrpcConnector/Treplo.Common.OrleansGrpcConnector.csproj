@@ -7,16 +7,16 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Google.Protobuf" Version="3.22.0" />
+        <PackageReference Include="Google.Protobuf" Version="3.22.0"/>
         <PackageReference Include="Grpc.Tools" Version="2.52.0">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.Orleans.Sdk" Version="7.1.2" />
+        <PackageReference Include="Microsoft.Orleans.Sdk" Version="7.1.2"/>
     </ItemGroup>
 
     <ItemGroup>
-        <Protobuf Include="..\Treplo_Api\v1\proto\common.proto" />
+        <Protobuf Include="..\Treplo_Api\v1\proto\common.proto"/>
     </ItemGroup>
 
 </Project>

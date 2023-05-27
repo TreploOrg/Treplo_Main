@@ -7,11 +7,11 @@ namespace Treplo.Converters.Ffmpeg;
 
 public sealed class FfmpegConverter : IAudioConverter
 {
+    private readonly string arguments;
     private readonly Command command;
     private readonly StringBuilder errorBuilder;
     private readonly Pipe inputPipe = new();
     private readonly Pipe outputPipe = new();
-    private readonly string arguments;
 
     public FfmpegConverter(
         string path,
@@ -45,11 +45,12 @@ public sealed class FfmpegConverter : IAudioConverter
         Exception? localException = null;
         try
         {
-            Console.WriteLine("executing ffmpeg");
             var result = await command.ExecuteAsync(cancellationToken);
-            Console.WriteLine("executed ffmpeg");
             if (result.ExitCode != 0 || errorBuilder.Length > 0)
                 throw new FfmpegPipingException(errorBuilder.ToString(), arguments);
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception e)
         {
@@ -58,7 +59,6 @@ public sealed class FfmpegConverter : IAudioConverter
         }
         finally
         {
-            Console.WriteLine("exception ffmpeg");
             await inputPipe.Reader.CompleteAsync(localException);
             await outputPipe.Writer.CompleteAsync(localException);
         }
@@ -86,7 +86,7 @@ public sealed class FfmpegConverter : IAudioConverter
 
         AppendStreamRequest(in requiredFormat, argumentString);
 
-        return argumentString.Append("-").ToString();
+        return argumentString.Append('-').ToString();
 
         static void AppendStreamRequest(in StreamFormatRequest streamFormatRequest, StringBuilder stringBuilder)
         {
@@ -104,12 +104,12 @@ public sealed class FfmpegConverter : IAudioConverter
 
 public class FfmpegPipingException : Exception
 {
-    public string Arguments { get; }
-
     public FfmpegPipingException(string message, string arguments) : base(GetMessage(message, arguments))
     {
         Arguments = arguments;
     }
+
+    public string Arguments { get; }
 
     private static string GetMessage(string message, string arguments) => $"With arguments \"{arguments}\": {message}";
 }

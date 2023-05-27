@@ -3,6 +3,7 @@ using Discord.Interactions;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using Treplo.Common;
+using Treplo.Helpers;
 using Treplo.SearchService;
 using static Treplo.SearchService.SearchService;
 
@@ -61,7 +62,7 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
             track = searchResult.Track;
         }
 
-        var session = clusterClient.GetGrain<ISessionGrain>(Context.Guild.Id.ToString());
+        var session = clusterClient.GetGrain(Context.Guild.Id);
         if (query is not null)
             await session.Enqueue(track!);
         await session.StartPlay(voiceChannel.Id);
@@ -92,7 +93,7 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
             return;
         }
 
-        var session = clusterClient.GetGrain<ISessionGrain>(Context.Guild.Id.ToString());
+        var session = clusterClient.GetGrain(Context.Guild.Id);
 
         var tracksRequest = tracks.Select(x => x.Track);
 
@@ -116,14 +117,16 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
     [SlashCommand("pause", "Pauses currently playing song", true, RunMode.Async)]
     public async Task Pause()
     {
+        await DeferAsync(true);
         var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
         if (voiceChannel is null)
         {
-            await RespondAsync("User is not in a voice channel");
+            await FollowupAsync("User is not in a voice channel");
             return;
         }
 
-        var session = clusterClient.GetGrain<ISessionGrain>(Context.Guild.Id.ToString());
+        var session = clusterClient.GetGrain(Context.Guild.Id);
         await session.Pause();
+        await FollowupAsync("Playback paused");
     }
 }

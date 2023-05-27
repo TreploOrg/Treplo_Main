@@ -1,6 +1,4 @@
 ﻿using System.Net;
-using System.Reflection;
-using MediatR;
 using Treplo.SearchService.Searching;
 using Treplo.SearchService.Searching.Youtube;
 
@@ -10,18 +8,26 @@ public static class StartupHelpers
 {
     public static IServiceCollection AddYoutubeEngine(this IServiceCollection services)
     {
-        services.AddHttpClient<YoutubeEngine>().ConfigureHttpMessageHandlerBuilder(x =>
-        {
-            var handler = new HttpClientHandler
+        services.AddHttpClient<YoutubeEngine>().ConfigureHttpMessageHandlerBuilder(
+            x =>
             {
-                UseCookies = false,
-            };
+                var handler = new HttpClientHandler
+                {
+                    UseCookies = false,
+                };
 
-            if (handler.SupportsAutomaticDecompression)
-                handler.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+                if (handler.SupportsAutomaticDecompression)
+                    handler.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
 
-            x.PrimaryHandler = handler;
-        });
+                handler.CookieContainer.Add(new Cookie("CONSENT", "YES+cb", "/", ".youtube.com"));
+                x.PrimaryHandler = handler;
+            }
+        ).ConfigureHttpClient(
+            x => x.DefaultRequestHeaders.Add(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36"
+            )
+        );
 
         services.AddSingleton<ISearchEngine, YoutubeEngine>();
         return services;

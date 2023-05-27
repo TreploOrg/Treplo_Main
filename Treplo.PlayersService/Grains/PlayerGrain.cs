@@ -4,8 +4,8 @@ namespace Treplo.PlayersService.Grains;
 
 public sealed class PlayerGrain : Grain, IPlayerGrain
 {
-    private readonly Queue<Track> queue = new();
     private readonly ILogger<PlayerGrain> logger;
+    private readonly Queue<Track> queue = new();
     private LoopState loopState = LoopState.Off;
 
     public PlayerGrain(ILogger<PlayerGrain> logger)
@@ -16,7 +16,7 @@ public sealed class PlayerGrain : Grain, IPlayerGrain
     public ValueTask Enqueue(Track track)
     {
         queue.Enqueue(track);
-        logger.LogInformation("Enqueued {Track}", track);
+        logger.LogInformation("Enqueued {TrackTitle}", track.Title);
         return ValueTask.CompletedTask;
     }
 
@@ -24,12 +24,11 @@ public sealed class PlayerGrain : Grain, IPlayerGrain
 
     public ValueTask<Track?> Dequeue()
     {
-        if (!queue.TryDequeue(out var track)) 
+        if (!queue.TryDequeue(out var track))
             return ValueTask.FromResult<Track?>(null);
-        if(loopState == LoopState.On)
+        if (loopState == LoopState.On)
             queue.Enqueue(track);
         return ValueTask.FromResult<Track?>(track);
-
     }
 
     public ValueTask<LoopState> SwitchLoop()
@@ -45,15 +44,15 @@ public sealed class PlayerGrain : Grain, IPlayerGrain
         var n = array.Length;
         for (var i = array.Length - 1; i > 1; i--)
         {
-            var k = Random.Shared.Next(n + 1);  
+            var k = Random.Shared.Next(n + 1);
             (array[k], array[n]) = (array[n], array[k]);
         }
-        
+
         foreach (var track in array)
         {
             queue.Enqueue(track);
         }
-        
+
         return ValueTask.FromResult(array);
     }
 

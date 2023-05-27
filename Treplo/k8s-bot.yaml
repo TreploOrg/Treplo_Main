@@ -94,6 +94,11 @@ items:
                       fieldPath: status.podIP
                 - name: DOTNET_SHUTDOWNTIMEOUTSECONDS
                   value: "120"
+                - name: MongoSettings__ConnectionString
+                  valueFrom:
+                    secretKeyRef:
+                      name: mongo
+                      key: connection_string
               volumeMounts:
                 - name: bot-settings
                   mountPath: /app/appsettings.json

@@ -11,7 +11,7 @@ public readonly struct AudioSource
         Bitrate = bitrate;
         Filesize = filesize;
     }
-    
+
     [Id(0)] public readonly string Url;
     [Id(1)] public readonly Codec Codec;
     [Id(2)] public readonly Container Container;

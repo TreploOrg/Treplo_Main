@@ -23,8 +23,12 @@ public sealed class DiscordAudioClient : IAudioClient
 
     public async Task ConnectToChannel(ulong channelId)
     {
-        if (currentConnection is not null && currentConnection.ChannelId != channelId)
-            await Disconnect(); // if we are here means client is reconnecting to another channel, so we disconnect from existing one
+        if (currentConnection is not null)
+        {
+            if (currentConnection.ChannelId != channelId)
+                await Disconnect(); // if we are here means client is reconnecting to another channel, so we disconnect from existing one
+            return;
+        }
 
         var channel = await discordClient.GetChannelAsync(channelId);
         if (channel is not IVoiceChannel voiceChannel)
@@ -33,7 +37,7 @@ public sealed class DiscordAudioClient : IAudioClient
         var internalClient = await voiceChannel.ConnectAsync(true);
         internalClient.Disconnected += InternalClientOnDisconnected;
 
-        currentConnection = new ChannelConnection(channelId, internalClient);
+        currentConnection = new ChannelConnection(channelId, internalClient, voiceChannel);
     }
 
     public async ValueTask Disconnect()
@@ -49,27 +53,19 @@ public sealed class DiscordAudioClient : IAudioClient
     public async Task ConsumeAudioPipe(PipeReader audioPipe, CancellationToken cancellationToken)
     {
         if (currentConnection is null)
-        {
-            Console.WriteLine("we're fucked - already connected");
             throw new InvalidOperationException("Client is not connected");
-        }
 
         if (currentAudioConnection is not null)
-        {
-            Console.WriteLine("we're fucked - audio already connected");
             throw new InvalidOperationException("Client already playing audio");
-        }
 
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         currentAudioConnection = new CurrentAudioConnection(cts);
         var outStream = currentConnection.Stream;
-        await audioPipe.PipeThrough(PipeWriter.Create(new MemoryStream()), cts.Token);
-        Console.WriteLine("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         try
         {
+            await audioPipe.PipeThrough(outStream, cts.Token);
             await outStream.FlushAsync(cts.Token);
-            DisconnectAudio();
         }
         catch (OperationCanceledException)
         {
@@ -77,6 +73,10 @@ public sealed class DiscordAudioClient : IAudioClient
         catch (Exception e)
         {
             logger.LogError(e, "Exception during discord audio stream finalization");
+        }
+        finally
+        {
+            DisconnectAudio();
         }
     }
 
@@ -112,10 +112,15 @@ public sealed class DiscordAudioClient : IAudioClient
         local?.Dispose();
     }
 
-    private sealed record ChannelConnection(ulong ChannelId, IDiscordAudioClient CurrentAudioClient) : IAsyncDisposable
+    private sealed record ChannelConnection(
+        ulong ChannelId,
+        IDiscordAudioClient CurrentAudioClient,
+        IVoiceChannel voiceChannel
+    ) : IAsyncDisposable
     {
         private AudioOutStream? stream;
         public AudioOutStream Stream => stream ??= CurrentAudioClient.CreatePCMStream(AudioApplication.Music);
+
         public async ValueTask DisposeAsync()
         {
             var disposeTask = stream?.DisposeAsync();
@@ -123,6 +128,7 @@ public sealed class DiscordAudioClient : IAudioClient
                 await task;
             await CurrentAudioClient.StopAsync();
             CurrentAudioClient.Dispose();
+            await voiceChannel.DisconnectAsync();
         }
     }
 

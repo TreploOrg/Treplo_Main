@@ -53,6 +53,11 @@ items:
                       fieldPath: status.podIP
                 - name: DOTNET_SHUTDOWNTIMEOUTSECONDS
                   value: "120"
+                - name: MongoSettings__ConnectionString
+                  valueFrom:
+                    secretKeyRef:
+                      name: mongo
+                      key: connection_string
               ports:
                 - containerPort: 11111
                 - containerPort: 30000
