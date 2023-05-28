@@ -36,7 +36,7 @@ items:
                 limits:
                   memory: "500Mi"
                   cpu: "500m"
-              image: cr.yandex/crpuve6pejg4vvqnfrdt/searchservice:latest
+              image: dantesfoncake/bot:search_latest
               imagePullPolicy: Always
               ports:
                 - containerPort: 80

@@ -155,7 +155,8 @@ public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
             try
             {
                 logger.LogDebug("Started copying");
-                await stream.CopyToAsync(writer.Stream);
+                await stream.CopyToAsync(writer.Stream, cancellationToken);
+                await writer.Stream.FlushAsync(cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -190,7 +191,7 @@ public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
                 var isEnd = readResult < frameSize;
                 if (readResult != 0)
                 {
-                    logger.LogError("Got buffer");
+                    logger.LogDebug("Got buffer");
                     await serverStreamWriter.WriteAsync(
                         new AudioFrame
                         {

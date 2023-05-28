@@ -56,7 +56,7 @@ items:
           terminationGracePeriodSeconds: 180
           containers:
             - name: bot-silo-container
-              image: cr.yandex/crpuve6pejg4vvqnfrdt/bot:latest
+              image: dantesfoncake/bot:bot_latest
               imagePullPolicy: Always
               ports:
                 - containerPort: 11111

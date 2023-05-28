@@ -28,7 +28,7 @@ items:
           terminationGracePeriodSeconds: 180
           containers:
             - name: players-silo-container
-              image: cr.yandex/crpuve6pejg4vvqnfrdt/playerservice:latest
+              image: dantesfoncake/bot:player_latest
               imagePullPolicy: Always
               env:
                 - name: ORLEANS_SERVICE_ID
