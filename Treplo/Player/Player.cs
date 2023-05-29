@@ -199,11 +199,14 @@ public sealed class Player : IPlayer, IAsyncDisposable
 
 
                     startTimestamp = Stopwatch.GetTimestamp();
+                    endTimestamp = null;
                     var audioInTask = audioInputPipe.PipeThrough(converter.Input, cancellationToken);
                     var conversionTask = converter.Start(cancellationToken);
                     var audioOutTask = audioClient.ConsumeAudioPipe(converter.Output, cancellationToken);
 
                     await Task.WhenAll(audioInTask, audioOutTask, conversionTask);
+                    CurrentTrack = null;
+                    startTimestamp = null;
                 }
             }
             finally
