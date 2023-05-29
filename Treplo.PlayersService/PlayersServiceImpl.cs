@@ -1,4 +1,5 @@
 ﻿using System.Buffers;
+using System.Threading.Channels;
 using Google.Protobuf;
 using Grpc.Core;
 using Treplo.PlayersService.Grains;
@@ -96,24 +97,23 @@ public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
 
         try
         {
-            var cachePath = Path.GetTempFileName();
-
-            await ReadFromUrl(responseStream, context, cachePath, frameSize, request);
+            await ReadFromUrl(responseStream, context, frameSize, request);
         }
         catch (OperationCanceledException)
         {
         }
     }
 
+    private static readonly UnboundedChannelOptions ChannelOptions = new() { SingleWriter = true, SingleReader = true };
+
     private async Task ReadFromUrl(
         IServerStreamWriter<AudioFrame> responseStream,
         ServerCallContext context,
-        string cachePath,
         ulong frameSize,
         PlayRequest request
     )
     {
-        await using var cachePipe = new FilePipe(cachePath);
+        var cachePipe = Channel.CreateUnbounded<AudioFrame>(ChannelOptions);
         using var client = clientFactory.CreateClient(nameof(PlayersServiceImpl));
         using var message = new HttpRequestMessage
         {
@@ -129,15 +129,11 @@ public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
         response.EnsureSuccessStatusCode();
         await using var stream = await response.Content.ReadAsStreamAsync(context.CancellationToken);
 
-        var copyToCacheTask = CopyToCacheTask(stream, cachePipe.Writer, context.CancellationToken);
+        var copyToCacheTask = CopyToCacheTask(stream, (int)frameSize, cachePipe.Writer, context.CancellationToken);
         logger.LogDebug("Starting wait");
-        await Task.Delay(500, context.CancellationToken);
         var outputTask = StartOutputStream(
             responseStream,
-            (int)frameSize,
             cachePipe.Reader,
-            static pipe => pipe.ShouldTryRead,
-            cachePipe,
             context.CancellationToken
         );
 
@@ -146,64 +142,59 @@ public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
 
     private async Task CopyToCacheTask(
         Stream stream,
-        FilePipe.NotifyingWrapper writer,
+        int frameSize,
+        ChannelWriter<AudioFrame> writer,
         CancellationToken cancellationToken
     )
     {
-        await using (writer)
+        try
         {
-            try
+            using var memoryOwner = MemoryPool<byte>.Shared.Rent(frameSize);
+            logger.LogDebug("Started copying data");
+            while (!cancellationToken.IsCancellationRequested)
             {
-                logger.LogDebug("Started copying");
-                await stream.CopyToAsync(writer.Stream, cancellationToken);
-                await writer.Stream.FlushAsync(cancellationToken);
+                var readResult = await stream.ReadAtLeastAsync(memoryOwner.Memory, frameSize, false, cancellationToken);
+                var isEnd = readResult < frameSize;
+                await writer.WriteAsync(
+                    new AudioFrame
+                    {
+                        Bytes = ByteString.CopyFrom(memoryOwner.Memory[..readResult].Span),
+                        IsEnd = isEnd,
+                    },
+                    cancellationToken
+                );
+                
+                if(isEnd)
+                    return;
             }
-            catch (OperationCanceledException)
-            {
-            }
-            catch (Exception e)
-            {
-                logger.LogError(e, "Error during audio receiving from source");
-            }
-            finally
-            {
-                logger.LogDebug("Finished downloading audio");
-            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Error during audio receiving from source");
+        }
+        finally
+        {
+            logger.LogDebug("Finished downloading audio");
+            writer.Complete();
         }
     }
 
-    private async Task StartOutputStream<T>(
+    private async Task StartOutputStream(
         IServerStreamWriter<AudioFrame> serverStreamWriter,
-        int frameSize,
-        Stream reader,
-        Func<T, bool> shouldTryReadNext,
-        T data,
+        ChannelReader<AudioFrame> reader,
         CancellationToken cancellationToken
     )
     {
         logger.LogDebug("Started output");
-        using var buffer = MemoryPool<byte>.Shared.Rent(frameSize);
         try
         {
-            while (!cancellationToken.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested && await reader.WaitToReadAsync(cancellationToken))
             {
-                var readResult = await reader.ReadAtLeastAsync(buffer.Memory, frameSize, false, cancellationToken);
-                var isEnd = readResult < frameSize;
-                if (readResult != 0)
-                {
-                    logger.LogDebug("Got buffer");
-                    await serverStreamWriter.WriteAsync(
-                        new AudioFrame
-                        {
-                            Bytes = UnsafeByteOperations.UnsafeWrap(buffer.Memory[..readResult]),
-                            IsEnd = isEnd && !shouldTryReadNext(data),
-                        },
-                        cancellationToken
-                    );
-                }
-
-                if (isEnd && shouldTryReadNext(data))
-                    await Task.Delay(100, cancellationToken);
+                while (reader.TryRead(out var frame))
+                    await serverStreamWriter.WriteAsync(frame, cancellationToken);
             }
         }
         catch (OperationCanceledException)
@@ -216,55 +207,6 @@ public sealed class PlayersServiceImpl : PlayersService.PlayersServiceBase
         finally
         {
             logger.LogDebug("Sent all audio");
-        }
-    }
-}
-
-internal class FilePipe : IAsyncDisposable
-{
-    private readonly string path;
-    private int shouldTryRead = 1;
-
-    public FilePipe(string path)
-    {
-        this.path = path;
-        Writer = new NotifyingWrapper(File.Open(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite), this);
-        Reader = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-    }
-
-    public Stream Reader { get; }
-    public NotifyingWrapper Writer { get; }
-
-    public bool ShouldTryRead => shouldTryRead == 1;
-
-    public async ValueTask DisposeAsync()
-    {
-        await Writer.DisposeAsync();
-        await Reader.DisposeAsync();
-        File.Delete(path);
-    }
-
-    private void CompleteWriter()
-    {
-        Interlocked.Exchange(ref shouldTryRead, 0);
-    }
-
-    public class NotifyingWrapper : IAsyncDisposable
-    {
-        private readonly FilePipe pipe;
-
-        public NotifyingWrapper(Stream stream, FilePipe pipe)
-        {
-            this.pipe = pipe;
-            Stream = stream;
-        }
-
-        public Stream Stream { get; }
-
-        public async ValueTask DisposeAsync()
-        {
-            await Stream.DisposeAsync();
-            pipe.CompleteWriter();
         }
     }
 }
