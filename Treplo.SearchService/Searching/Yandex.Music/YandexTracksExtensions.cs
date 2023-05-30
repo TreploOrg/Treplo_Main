@@ -30,7 +30,7 @@ public static class YandexTracksExtensions
 
     public static Thumbnail ToThumbnail(this string uri) => new()
     {
-        Url = uri,
+        Url = $"https://{uri.Replace("%%", "1000x1000")}",
     };
 
     private static Bitrate ToBitrate(this int bitrateInKbps) => new()

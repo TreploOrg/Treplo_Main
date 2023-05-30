@@ -25,14 +25,17 @@ public class YandexMusicEngine : ISearchEngine
 
     public async IAsyncEnumerable<Result<Track, Error>> FindInternalAsync(
         string query,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default
-    )
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var tracks = (await yandexMusicApi.Search.SearchAsync(authStorage, query, YSearchType.Track)).Result.Tracks
-            .Results;
+        var searchResult = await yandexMusicApi.Search.SearchAsync(authStorage, query, YSearchType.Track);
+        var tracks = searchResult.Result.Tracks.Results;
         using var enumerator = tracks.GetEnumerator();
-        while (enumerator.MoveNext() && !cancellationToken.IsCancellationRequested)
+        while (!cancellationToken.IsCancellationRequested)
         {
+            if (!enumerator.MoveNext())
+            { 
+                break;
+            }
             if (enumerator.Current == null)
                 yield break;
             var result = await MapToGrpcTrack(enumerator.Current);
@@ -50,15 +53,16 @@ public class YandexMusicEngine : ISearchEngine
     {
         if (track == null)
             throw new ArgumentNullException(nameof(track));
-        var metadata = await yandexMusicApi.Track.GetMetadataForDownloadAsync(authStorage, track);
-        var metadataForDownload = metadata.Result.First();
+        var metadata = (await yandexMusicApi.Track.GetMetadataForDownloadAsync(authStorage, track)).Result
+            .OrderByDescending<YTrackDownloadInfo, int>(i => i.BitrateInKbps)
+            .First(m => m.Codec == "mp3");
         var fileLink = await yandexMusicApi.Track.GetFileLinkAsync(authStorage, track);
         var createdTrack = new Track
         {
             Author = track.Artists.GetArtistsNames(),
             Title = track.Title,
             Thumbnail = track.CoverUri.ToThumbnail(),
-            Source = metadataForDownload.ToAudioSource(fileLink, track.FileSize),
+            Source = metadata.ToAudioSource(fileLink, track.FileSize),
             Duration = Duration.FromTimeSpan(TimeSpan.FromMilliseconds(track.DurationMs)),
         };
         return Result<Track, Error>.Ok(createdTrack);

@@ -21,7 +21,7 @@ public class YandexMusicSearchEngineTests
     [Test]
     public  void Engine_ShouldFindTrack_BySongTitle()
     {
-        var collection = yandexMusicEngine.FindInternalAsync("Jailbreak");
+        var collection = yandexMusicEngine.FindInternalAsync("Jailbreak", new CancellationToken());
         var enumerator = collection.GetAsyncEnumerator();
         enumerator.Current.IsOk.Should().BeTrue();
     }
@@ -35,5 +35,6 @@ public class YandexMusicSearchEngineTests
         var resulted =yandexMusicEngine.MapToGrpcTrack(tracks.First()).Result.Unwrap();
         resulted.Title.Should().Be("Killshot");
         resulted.Author.Should().Be("Eminem");
+        resulted.Source.Codec.Name.Should().Be("mp3");
     }
 }
