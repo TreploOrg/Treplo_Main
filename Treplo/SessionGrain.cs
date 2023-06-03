@@ -81,6 +81,12 @@ public sealed class SessionGrain : Grain, ISessionGrain
         await player.Pause();
     }
 
+    public async ValueTask Skip()
+    {
+        logger.LogInformation("Skipping playback in session {SessionId}", this.GetGuildId());
+        await player.Skip();
+    }
+
     public async ValueTask Enqueue(Track track)
     {
         logger.LogInformation(

@@ -9,4 +9,5 @@ public interface ISessionGrain : IGrainWithIntegerKey
     ValueTask<Guid> StartSearch(Track[] searchVariants);
     ValueTask<Track> EndSearch(Guid searchId, uint searchResultIndex);
     ValueTask Pause();
+    ValueTask Skip();
 }

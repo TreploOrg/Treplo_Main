@@ -129,4 +129,20 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
         await session.Pause();
         await FollowupAsync("Playback paused");
     }
+    
+    [SlashCommand("skip", "Skips currently playing song", true, RunMode.Async)]
+    public async Task Skip()
+    {
+        await DeferAsync(true);
+        var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
+        if (voiceChannel is null)
+        {
+            await FollowupAsync("User is not in a voice channel");
+            return;
+        }
+
+        var session = clusterClient.GetGrain(Context.Guild.Id);
+        await session.Skip();
+        await FollowupAsync("Skipped song");
+    }
 }
