@@ -31,7 +31,7 @@ public sealed class Player : IPlayer, IAsyncDisposable
     private readonly StreamFormatRequest formatRequest;
     private readonly PlayersService.PlayersService.PlayersServiceClient playersServiceClient;
     private readonly StateMachine<PlayerStatus, PlayerTriggers> stateMachine;
-    private CancellationTokenSource cts = new();
+    private CancellationTokenSource pauseCts = new();
 
     private Track? currentTrack;
     private Func<Task>? endCallback;
@@ -127,7 +127,16 @@ public sealed class Player : IPlayer, IAsyncDisposable
 
         stateMachine.Configure(Playing)
             .Permit(PlayerTriggers.Pause, Paused)
-            .Permit(PlayerTriggers.Skip, NoTrack)
+            .InternalTransition(
+                PlayerTriggers.Skip,
+                _ =>
+                {
+                    StopPlay();
+                    CurrentTrack = null;
+                    startTimestamp = null;
+                    StartPlay();
+                }
+            )
             .Permit(PlayerTriggers.QueueFinished, NoTrack)
             .Permit(PlayerTriggers.Disconnect, NotConnected)
             .Ignore(PlayerTriggers.Play)
@@ -174,15 +183,15 @@ public sealed class Player : IPlayer, IAsyncDisposable
 
     private void StopPlay()
     {
-        cts.Cancel();
-        cts.Dispose();
-        cts = new CancellationTokenSource();
+        pauseCts.Cancel();
+        pauseCts.Dispose();
+        pauseCts = new CancellationTokenSource();
         playback = null;
     }
 
     private void StartPlay()
     {
-        var token = cts.Token;
+        var token = pauseCts.Token;
         playback = StartPlayCore(token);
 
         async Task StartPlayCore(CancellationToken cancellationToken)
@@ -205,8 +214,11 @@ public sealed class Player : IPlayer, IAsyncDisposable
                     var audioOutTask = audioClient.ConsumeAudioPipe(converter.Output, cancellationToken);
 
                     await Task.WhenAll(audioInTask, audioOutTask, conversionTask);
-                    CurrentTrack = null;
-                    startTimestamp = null;
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        CurrentTrack = null;
+                        startTimestamp = null;
+                    }
                 }
             }
             finally
