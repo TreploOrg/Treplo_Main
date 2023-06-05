@@ -103,6 +103,7 @@ public sealed class Player : IPlayer, IAsyncDisposable
 
     private void ConfigureStateMachine()
     {
+        stateMachine.OnUnhandledTriggerAsync((state, trigger) => Task.CompletedTask);
         stateMachine.Configure(None)
             .Permit(PlayerTriggers.Connect, Connected);
         stateMachine.Configure(NoTrack)
