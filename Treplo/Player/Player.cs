@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using Stateless;
 using Treplo.Common;
 using Treplo.Converters;
@@ -28,8 +29,10 @@ public sealed class Player : IPlayer, IAsyncDisposable
     private readonly Lazy<DequeueRequest> cachedDequeue;
     private readonly StateMachine<PlayerStatus, PlayerTriggers>.TriggerWithParameters<ulong> connectTrigger;
     private readonly IAudioConverterFactory converterFactory;
+    private readonly ulong guildId;
     private readonly StreamFormatRequest formatRequest;
     private readonly PlayersService.PlayersService.PlayersServiceClient playersServiceClient;
+    private readonly ILogger<Player> logger;
     private readonly StateMachine<PlayerStatus, PlayerTriggers> stateMachine;
     private CancellationTokenSource pauseCts = new();
 
@@ -41,6 +44,7 @@ public sealed class Player : IPlayer, IAsyncDisposable
 
     public Player(
         PlayersService.PlayersService.PlayersServiceClient playersServiceClient,
+        ILogger<Player> logger,
         IRawAudioSource audioSource,
         IAudioClient audioClient,
         IAudioConverterFactory converterFactory,
@@ -49,9 +53,11 @@ public sealed class Player : IPlayer, IAsyncDisposable
     )
     {
         this.playersServiceClient = playersServiceClient;
+        this.logger = logger;
         this.audioSource = audioSource;
         this.audioClient = audioClient;
         this.converterFactory = converterFactory;
+        this.guildId = guildId;
         this.formatRequest = formatRequest;
         cachedDequeue = new Lazy<DequeueRequest>(
             () => new DequeueRequest
@@ -103,7 +109,12 @@ public sealed class Player : IPlayer, IAsyncDisposable
 
     private void ConfigureStateMachine()
     {
-        stateMachine.OnUnhandledTriggerAsync((state, trigger) => Task.CompletedTask);
+        stateMachine.OnUnhandledTriggerAsync((state, trigger) =>
+            {
+                logger.LogWarning("Not registered transition occured in {PlayerId}: from {Status} via {Trigger}", guildId, state, trigger);
+                return Task.CompletedTask;
+            }
+        );
         stateMachine.Configure(None)
             .Permit(PlayerTriggers.Connect, Connected);
         stateMachine.Configure(NoTrack)
@@ -164,8 +175,12 @@ public sealed class Player : IPlayer, IAsyncDisposable
             .InternalTransitionAsync(connectTrigger, (channelId, _) => OnConnect(channelId));
 
         stateMachine.OnTransitioned(
-            transition => Console.WriteLine(
-                $"From: {transition.Source} To: {transition.Destination} Via: {transition.Trigger}"
+            transition => logger.LogInformation(
+                "Transition in {PlayerId}: from {Status} to {Destination} via {Trigger}",
+                guildId,
+                transition.Source,
+                transition.Destination,
+                transition.Trigger
             )
         );
     }
