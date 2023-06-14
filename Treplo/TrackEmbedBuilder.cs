@@ -13,6 +13,7 @@ public interface ITrackEmbedBuilder
 public class TrackEmbedBuilder : ITrackEmbedBuilder
 {
     private const int EmbedColor = 0x0099FF;
+    private const string TimeFormat = @"hh\:mm\:ss";
 
     public EmbedBuilder ForTrack(Track track)
         => new EmbedBuilder().WithColor(EmbedColor)
@@ -20,7 +21,7 @@ public class TrackEmbedBuilder : ITrackEmbedBuilder
             .WithTitle(track.Title)
             .WithFields(
                 new EmbedFieldBuilder().WithName("Author").WithValue(track.Author),
-                new EmbedFieldBuilder().WithName("Duration").WithValue(track.Duration.ToTimeSpan().ToString("g"))
+                new EmbedFieldBuilder().WithName("Duration").WithValue(track.Duration.ToTimeSpan().ToString(TimeFormat))
             )
             .WithImageUrl(track.Thumbnail.Url);
 
@@ -40,7 +41,7 @@ public class TrackEmbedBuilder : ITrackEmbedBuilder
             .WithTitle("Player state")
             .AddField(x => x.WithName("Loop").WithValue(playerState.Loop.ToString()).WithIsInline(true))
             .AddField(x => x.WithName("Tracks in queue").WithValue(playerState.Tracks.Length.ToString()).WithIsInline(true))
-            .AddField(x => x.WithName("Total queue play time").WithValue(totalPlayTime.ToString("g")));
+            .AddField(x => x.WithName("Total queue play time").WithValue(totalPlayTime.ToString(TimeFormat)));
 
         {
             if (current is var (currentTrack, playTime))
@@ -57,7 +58,7 @@ public class TrackEmbedBuilder : ITrackEmbedBuilder
         {
             var track = playerState.Tracks[i];
             var name = (i + 1).ToString();
-            var value = $"{track.Title} - {track.Author}. {track.Duration.ToTimeSpan():g}";
+            var value = $"{track.Title} - {track.Author}. {track.Duration.ToTimeSpan().ToString(TimeFormat)}";
             queueEmbed.AddField(name, value);
         }
 
@@ -70,7 +71,7 @@ public class TrackEmbedBuilder : ITrackEmbedBuilder
             .WithTitle($"Currently playing - {track.Title}")
             .AddField(
                 x => x.WithName("Play time")
-                    .WithValue($"{playTime:g}/{track.Duration.ToTimeSpan():g}")
+                    .WithValue($"{playTime.ToString(TimeFormat)}/{track.Duration.ToTimeSpan().ToString(TimeFormat)}")
             )
             .AddField(x => x.WithName("Author").WithValue(track.Author))
             .WithImageUrl(track.Thumbnail.Url);
