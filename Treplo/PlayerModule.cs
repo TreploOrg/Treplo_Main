@@ -14,15 +14,18 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
     private readonly IClusterClient clusterClient;
     private readonly ILogger<PlayerModule> logger;
     private readonly SearchServiceClient searchServiceClient;
+    private readonly ITrackEmbedBuilder embedBuilder;
 
     public PlayerModule(
         IClusterClient clusterClient,
         SearchServiceClient searchServiceClient,
+        ITrackEmbedBuilder embedBuilder,
         ILogger<PlayerModule> logger
     )
     {
         this.clusterClient = clusterClient;
         this.searchServiceClient = searchServiceClient;
+        this.embedBuilder = embedBuilder;
         this.logger = logger;
     }
 
@@ -62,11 +65,17 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
             track = searchResult.Track;
         }
 
+        Embed? embed = null;
         var session = clusterClient.GetGrain(Context.Guild.Id);
         if (query is not null)
+        {
             await session.Enqueue(track!);
+            embed = embedBuilder.ForTrack(track!).WithDescription("Added track!").WithAuthor(Context.Client.CurrentUser)
+                .Build();
+        }
+
         await session.StartPlay(voiceChannel.Id);
-        await FollowupAsync("Starting playback");
+        await FollowupAsync("Starting playback", embed: embed);
     }
 
     [SlashCommand("search", "Searches for a song and allows to choose from found songs", true, RunMode.Async)]
@@ -129,7 +138,7 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
         await session.Pause();
         await FollowupAsync("Playback paused");
     }
-    
+
     [SlashCommand("skip", "Skips currently playing song", true, RunMode.Async)]
     public async Task Skip()
     {
@@ -144,5 +153,39 @@ public class PlayerModule : InteractionModuleBase<SocketInteractionContext>
         var session = clusterClient.GetGrain(Context.Guild.Id);
         await session.Skip();
         await FollowupAsync("Skipped song");
+    }
+
+    [SlashCommand("show", "Shows current state of player", true, RunMode.Async)]
+    public async Task Show()
+    {
+        await DeferAsync(true);
+        var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
+        if (voiceChannel is null)
+        {
+            await FollowupAsync("User is not in a voice channel");
+            return;
+        }
+
+        var session = clusterClient.GetGrain(Context.Guild.Id);
+        var current = await session.GetCurrentlyPlaying();
+        var playerState = await session.GetPlayerState();
+        var embeds = embedBuilder.ForState(current, playerState).Select(x => x.WithAuthor(Context.Client.CurrentUser));
+        await FollowupAsync("Current player state", embeds: embeds.Select(x => x.Build()).ToArray(), ephemeral: true);
+    }
+
+    [SlashCommand("loop", "Changes state of the loop for playlist", true, RunMode.Async)]
+    public async Task Loop()
+    {
+        await DeferAsync(true);
+        var voiceChannel = (Context.User as IGuildUser)?.VoiceChannel;
+        if (voiceChannel is null)
+        {
+            await FollowupAsync("User is not in a voice channel");
+            return;
+        }
+        
+        var session = clusterClient.GetGrain(Context.Guild.Id);
+        var loopState = await session.Loop();
+        await FollowupAsync($"Playlist loop is {loopState}");
     }
 }

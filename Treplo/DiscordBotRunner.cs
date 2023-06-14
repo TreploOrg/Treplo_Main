@@ -12,6 +12,7 @@ public sealed class DiscordBotRunner : IHostedService
 {
     private readonly DiscordSocketClient client;
     private readonly IClusterClient clusterClient;
+    private readonly ITrackEmbedBuilder embedBuilder;
     private readonly IDateTimeManager dateTimeManager;
     private readonly InteractionService interactionService;
     private readonly ILogger<DiscordBotRunner> logger;
@@ -24,6 +25,7 @@ public sealed class DiscordBotRunner : IHostedService
         IServiceProvider serviceProvider,
         IDateTimeManager dateTimeManager,
         IClusterClient clusterClient,
+        ITrackEmbedBuilder embedBuilder,
         IOptions<DiscordClientSettings> settings,
         ILogger<DiscordBotRunner> logger
     )
@@ -33,6 +35,7 @@ public sealed class DiscordBotRunner : IHostedService
         this.serviceProvider = serviceProvider;
         this.dateTimeManager = dateTimeManager;
         this.clusterClient = clusterClient;
+        this.embedBuilder = embedBuilder;
         this.settings = settings;
         this.logger = logger;
     }
@@ -94,9 +97,9 @@ public sealed class DiscordBotRunner : IHostedService
                         var session =
                             clusterClient.GetGrain(component.GuildId.GetValueOrDefault());
                         var track = await session.EndSearch(searchId, index);
-                        var trackTitle = track.Title;
 
-                        //await component.UpdateAsync(x => x.Content = $"Selected track {trackTitle}");
+                        var embed = embedBuilder.ForTrack(track).WithAuthor(client.CurrentUser).Build();
+                        await component.FollowupAsync("Adding track to queue", embed: embed, ephemeral: true);
 
                         var guildUser = component.User as IGuildUser;
                         await session.StartPlay(guildUser.VoiceChannel.Id);
@@ -104,7 +107,6 @@ public sealed class DiscordBotRunner : IHostedService
                     catch (Exception e)
                     {
                         logger.LogError(e, "Error during search responding");
-                        throw;
                     }
                 }
             );

@@ -47,6 +47,7 @@ internal static class Program
                     services.AddScoped<IAudioClient, DiscordAudioClient>();
                     services.AddScoped<IPlayerFactory, PlayerFactory>();
                     services.AddSingleton<IRawAudioSource, RawAudioSource>();
+                    services.AddSingleton<ITrackEmbedBuilder, TrackEmbedBuilder>();
                     SetupDiscordBot(services, hostCtx);
                     services.AddSingleton<IDateTimeManager, DateTimeManager>();
                     services.AddSingleton<ResolverFactory>(

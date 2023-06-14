@@ -87,6 +87,46 @@ public sealed class SessionGrain : Grain, ISessionGrain
         await player.Skip();
     }
 
+    public ValueTask<(Track, TimeSpan)?> GetCurrentlyPlaying()
+    {
+        var track = player.CurrentTrack;
+        var time = player.PlaybackTime;
+        if (track is null || time is null)
+            return ValueTask.FromResult<(Track, TimeSpan)?>(null);
+
+        return ValueTask.FromResult<(Track, TimeSpan)?>((track, time.GetValueOrDefault()));
+    }
+
+    public async Task<PlayerState> GetPlayerState()
+    {
+        var state = await playerServiceClient.GetStateAsync(
+            new GetStateRequest
+            {
+                PlayerRequest = new PlayerIdentifier
+                {
+                    PlayerId = this.GetGuildId().ToString(),
+                }
+            }
+        );
+
+        return new PlayerState(state.Loop, state.Queue.Tracks.ToArray());
+    }
+
+    public async Task<LoopState> Loop()
+    {
+        var result = await  playerServiceClient.LoopAsync(
+            new LoopRequest()
+            {
+                PlayerRequest = new PlayerIdentifier()
+                {
+                    PlayerId = this.GetGuildId().ToString(),
+                }
+            }
+        );
+
+        return result.Loop;
+    }
+
     public async ValueTask Enqueue(Track track)
     {
         logger.LogInformation(

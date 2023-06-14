@@ -1,4 +1,5 @@
 ﻿using Treplo.Common;
+using Treplo.PlayersService;
 
 namespace Treplo;
 
@@ -10,4 +11,7 @@ public interface ISessionGrain : IGrainWithIntegerKey
     ValueTask<Track> EndSearch(Guid searchId, uint searchResultIndex);
     ValueTask Pause();
     ValueTask Skip();
+    ValueTask<(Track,TimeSpan)?> GetCurrentlyPlaying();
+    Task<PlayerState> GetPlayerState();
+    Task<LoopState> Loop();
 }
