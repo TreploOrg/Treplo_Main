@@ -57,8 +57,8 @@ public class TrackEmbedBuilder : ITrackEmbedBuilder
         for (var i = 0; i < playerState.Tracks.Length; i++)
         {
             var track = playerState.Tracks[i];
-            var name = (i + 1).ToString();
-            var value = $"{track.Title} - {track.Author}. {track.Duration.ToTimeSpan().ToString(TimeFormat)}";
+            var name = $"{i + 1}. {track.Title}";
+            var value = $"{track.Author}. {track.Duration.ToTimeSpan().ToString(TimeFormat)}";
             queueEmbed.AddField(name, value);
         }
 
